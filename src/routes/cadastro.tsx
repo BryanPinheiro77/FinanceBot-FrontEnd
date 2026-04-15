@@ -4,8 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AuthLayout } from "@/components/AuthLayout";
 import { Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
+import { ApiError } from "@/lib/api";
+import { requireAnonymous } from "@/lib/auth-guards";
+import { getAccounts } from "@/lib/auth-api";
+import { hasCompletedOnboarding } from "@/lib/onboarding";
 
 export const Route = createFileRoute("/cadastro")({
+  beforeLoad: requireAnonymous,
   head: () => ({
     meta: [
       { title: "Cadastro — Finance Bot" },
@@ -17,13 +23,43 @@ export const Route = createFileRoute("/cadastro")({
 
 function CadastroPage() {
   const navigate = useNavigate();
+  const { register, isLoading: isAuthLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", password: "", confirm: "" });
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate({ to: "/onboarding" });
+    setError(null);
+
+    if (form.password.length < 6) {
+      setError("A senha deve ter no mínimo 6 caracteres.");
+      return;
+    }
+
+    if (form.password !== form.confirm) {
+      setError("As senhas não coincidem.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const user = await register({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+      });
+      const accounts = await getAccounts();
+      const nextPath = hasCompletedOnboarding(user, accounts) ? "/dashboard" : "/onboarding";
+      await navigate({ to: nextPath });
+    } catch (submitError) {
+      setError(submitError instanceof ApiError ? submitError.message : "Não foi possível criar sua conta.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -53,11 +89,11 @@ function CadastroPage() {
           <div className="relative">
             <Input
               type={showPassword ? "text" : "password"}
-              placeholder="Mínimo 8 caracteres"
+              placeholder="Mínimo 6 caracteres"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               required
-              minLength={8}
+              minLength={6}
             />
             <button
               type="button"
@@ -88,8 +124,16 @@ function CadastroPage() {
           </div>
         </div>
 
-        <Button type="submit" variant="hero" size="lg" className="w-full h-12 rounded-xl">
-          Criar minha conta
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+        <Button
+          type="submit"
+          variant="hero"
+          size="lg"
+          className="w-full h-12 rounded-xl"
+          disabled={isSubmitting || isAuthLoading}
+        >
+          {isSubmitting ? "Criando conta..." : "Criar minha conta"}
         </Button>
 
         <p className="text-center text-sm text-muted-foreground">

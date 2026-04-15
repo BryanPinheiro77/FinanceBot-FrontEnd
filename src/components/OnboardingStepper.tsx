@@ -5,11 +5,9 @@ const steps = [
   "Boas-vindas",
   "Renda",
   "Conta",
-  "Categorias",
   "Confirmação",
   "Código",
   "Conectar",
-  "Premium",
 ];
 
 export function OnboardingStepper({ currentStep }: { currentStep: number }) {

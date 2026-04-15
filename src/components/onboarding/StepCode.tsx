@@ -2,9 +2,14 @@ import { Bot, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 
-interface Props { code: string; copied: boolean; onCopy: () => void; }
+interface Props {
+  code: string;
+  copied: boolean;
+  onCopy: () => void;
+  expiresAtLabel?: string | null;
+}
 
-export function StepCode({ code, copied, onCopy }: Props) {
+export function StepCode({ code, copied, onCopy, expiresAtLabel }: Props) {
   return (
     <div className="max-w-md mx-auto text-center">
       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 20 }} className="w-14 h-14 rounded-2xl bg-telegram/10 flex items-center justify-center mx-auto mb-6">
@@ -26,7 +31,7 @@ export function StepCode({ code, copied, onCopy }: Props) {
         </Button>
       </motion.div>
       <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="text-xs text-muted-foreground">
-        Este código expira em 15 minutos.
+        {expiresAtLabel ? `Este código expira em ${expiresAtLabel}.` : "Este código expira em alguns minutos."}
       </motion.p>
     </div>
   );

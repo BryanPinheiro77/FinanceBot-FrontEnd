@@ -4,8 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AuthLayout } from "@/components/AuthLayout";
 import { Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
+import { ApiError } from "@/lib/api";
+import { requireAnonymous } from "@/lib/auth-guards";
+import { getAccounts } from "@/lib/auth-api";
+import { hasCompletedOnboarding } from "@/lib/onboarding";
 
 export const Route = createFileRoute("/login")({
+  beforeLoad: requireAnonymous,
   head: () => ({
     meta: [
       { title: "Login — Finance Bot" },
@@ -17,12 +23,30 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { login, isLoading: isAuthLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate({ to: "/onboarding" });
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      const user = await login({
+        email: form.email.trim(),
+        password: form.password,
+      });
+      const accounts = await getAccounts();
+      const nextPath = hasCompletedOnboarding(user, accounts) ? "/dashboard" : "/onboarding";
+      await navigate({ to: nextPath });
+    } catch (submitError) {
+      setError(submitError instanceof ApiError ? submitError.message : "Não foi possível entrar agora.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -61,8 +85,16 @@ function LoginPage() {
           </div>
         </div>
 
-        <Button type="submit" variant="hero" size="lg" className="w-full h-12 rounded-xl">
-          Entrar
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+        <Button
+          type="submit"
+          variant="hero"
+          size="lg"
+          className="w-full h-12 rounded-xl"
+          disabled={isSubmitting || isAuthLoading}
+        >
+          {isSubmitting ? "Entrando..." : "Entrar"}
         </Button>
 
         <p className="text-center text-sm text-muted-foreground">
