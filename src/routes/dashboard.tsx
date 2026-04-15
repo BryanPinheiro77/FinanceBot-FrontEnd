@@ -1,12 +1,19 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Bot, DollarSign, Building2, CheckCircle, Send, LogOut, Sun, Moon, ExternalLink } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/context/auth-context";
+import { requireAuth } from "@/lib/auth-guards";
+import { getAccounts, type AccountResponse } from "@/lib/auth-api";
+import { ApiError } from "@/lib/api";
+import { hasCompletedOnboarding } from "@/lib/onboarding";
 
 const TELEGRAM_BOT_URL = "http://t.me/YourFinanceAssistence_Bot";
 
 export const Route = createFileRoute("/dashboard")({
+  beforeLoad: requireAuth,
   head: () => ({
     meta: [
       { title: "Painel — Finance Bot" },
@@ -18,6 +25,76 @@ export const Route = createFileRoute("/dashboard")({
 
 function DashboardPage() {
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+  const { user, isLoading, logout } = useAuth();
+  const [accounts, setAccounts] = useState<AccountResponse[]>([]);
+  const [isFetching, setIsFetching] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+
+    if (!user) {
+      void navigate({ to: "/login" });
+    }
+  }, [isLoading, navigate, user]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    let active = true;
+
+    const loadAccounts = async () => {
+      setIsFetching(true);
+      setError(null);
+
+      try {
+        const accountList = await getAccounts();
+
+        if (!active) {
+          return;
+        }
+
+        if (!hasCompletedOnboarding(user, accountList)) {
+          await navigate({ to: "/onboarding" });
+          return;
+        }
+
+        setAccounts(accountList);
+      } catch (loadError) {
+        if (active) {
+          setError(loadError instanceof ApiError ? loadError.message : "Não foi possível carregar o painel.");
+        }
+      } finally {
+        if (active) {
+          setIsFetching(false);
+        }
+      }
+    };
+
+    void loadAccounts();
+
+    return () => {
+      active = false;
+    };
+  }, [navigate, user]);
+
+  const primaryAccount = useMemo(() => accounts[0] ?? null, [accounts]);
+
+  if (isLoading || isFetching) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="text-center">
+          <p className="text-lg font-semibold text-foreground">Carregando seu painel...</p>
+          <p className="text-sm text-muted-foreground mt-2">Aguarde um instante.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -31,10 +108,16 @@ function DashboardPage() {
             <Button variant="ghost" size="icon" onClick={toggleTheme} className="text-muted-foreground">
               {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </Button>
-            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground" asChild>
-              <Link to="/">
-                <LogOut className="w-4 h-4" /> Sair
-              </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground"
+              onClick={() => {
+                logout();
+                void navigate({ to: "/" });
+              }}
+            >
+              <LogOut className="w-4 h-4" /> Sair
             </Button>
           </div>
         </div>
@@ -60,8 +143,14 @@ function DashboardPage() {
           </div>
         </motion.div>
 
+        {error ? (
+          <div className="mb-8 rounded-2xl border border-destructive/20 bg-destructive/5 px-5 py-4 text-sm text-destructive">
+            {error}
+          </div>
+        ) : null}
+
         <h1 className="text-2xl font-bold text-foreground mb-6" style={{ fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif' }}>
-          Visão Geral
+          Olá, {user?.name ?? "usuário"}
         </h1>
 
         <div className="grid sm:grid-cols-3 gap-5">
@@ -77,7 +166,11 @@ function DashboardPage() {
               </div>
               <span className="text-sm text-muted-foreground">Renda mensal</span>
             </div>
-            <p className="text-2xl font-bold text-foreground">R$ 5.000,00</p>
+            <p className="text-2xl font-bold text-foreground">
+              {user?.monthlyBaseIncome != null
+                ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(user.monthlyBaseIncome)
+                : "Não informada"}
+            </p>
           </motion.div>
 
           <motion.div
@@ -92,7 +185,7 @@ function DashboardPage() {
               </div>
               <span className="text-sm text-muted-foreground">Conta principal</span>
             </div>
-            <p className="text-2xl font-bold text-foreground">Nubank</p>
+            <p className="text-2xl font-bold text-foreground">{primaryAccount?.name ?? "Não cadastrada"}</p>
           </motion.div>
 
           <motion.div
@@ -108,8 +201,10 @@ function DashboardPage() {
               <span className="text-sm text-muted-foreground">Telegram</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-success" />
-              <p className="text-lg font-semibold text-foreground">Conectado</p>
+              <div className={`w-2 h-2 rounded-full ${user?.telegramLinked ? "bg-success" : "bg-muted-foreground"}`} />
+              <p className="text-lg font-semibold text-foreground">
+                {user?.telegramLinked ? "Conectado" : "Pendente"}
+              </p>
             </div>
           </motion.div>
         </div>
@@ -124,15 +219,37 @@ function DashboardPage() {
             </code>
           </div>
           <div>
-            <a
-              href={TELEGRAM_BOT_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm text-telegram hover:underline"
-            >
-              Abrir @YourFinanceAssistence_Bot no Telegram
-              <ExternalLink className="w-3 h-3" />
-            </a>
+            {user?.telegramLinkCode ? (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Use o código abaixo no Telegram para concluir o vínculo:
+                </p>
+                <div className="bg-muted rounded-xl p-4 inline-block">
+                  <code className="font-mono text-sm text-primary">/connect {user.telegramLinkCode}</code>
+                </div>
+                <div>
+                  <a
+                    href={TELEGRAM_BOT_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm text-telegram hover:underline"
+                  >
+                    Abrir @YourFinanceAssistence_Bot no Telegram
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <a
+                href={TELEGRAM_BOT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-telegram hover:underline"
+              >
+                Abrir @YourFinanceAssistence_Bot no Telegram
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
           </div>
         </div>
       </main>

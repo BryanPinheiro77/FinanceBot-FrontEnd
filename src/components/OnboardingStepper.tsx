@@ -2,14 +2,10 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const steps = [
-  "Boas-vindas",
   "Renda",
   "Conta",
   "Categorias",
-  "Confirmação",
-  "Código",
-  "Conectar",
-  "Premium",
+  "Telegram",
 ];
 
 export function OnboardingStepper({ currentStep }: { currentStep: number }) {
