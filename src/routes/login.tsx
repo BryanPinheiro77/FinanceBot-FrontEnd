@@ -7,8 +7,6 @@ import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { ApiError } from "@/lib/api";
 import { requireAnonymous } from "@/lib/auth-guards";
-import { getAccounts } from "@/lib/auth-api";
-import { hasCompletedOnboarding } from "@/lib/onboarding";
 
 export const Route = createFileRoute("/login")({
   beforeLoad: requireAnonymous,
@@ -35,13 +33,11 @@ function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const user = await login({
+      await login({
         email: form.email.trim(),
         password: form.password,
       });
-      const accounts = await getAccounts();
-      const nextPath = hasCompletedOnboarding(user, accounts) ? "/dashboard" : "/onboarding";
-      await navigate({ to: nextPath });
+      await navigate({ to: "/onboarding" });
     } catch (submitError) {
       setError(submitError instanceof ApiError ? submitError.message : "Não foi possível entrar agora.");
     } finally {

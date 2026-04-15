@@ -1,26 +1,28 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { OnboardingStepper } from "@/components/OnboardingStepper";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bot, ArrowRight, ArrowLeft } from "lucide-react";
-import { StepWelcome } from "@/components/onboarding/StepWelcome";
+import { Button } from "@/components/ui/button";
+import { OnboardingStepper } from "@/components/OnboardingStepper";
 import { StepIncome } from "@/components/onboarding/StepIncome";
 import { StepAccount } from "@/components/onboarding/StepAccount";
-import { StepConfirmation } from "@/components/onboarding/StepConfirmation";
+import { StepCategories } from "@/components/onboarding/StepCategories";
 import { StepCode } from "@/components/onboarding/StepCode";
 import { StepConnect } from "@/components/onboarding/StepConnect";
 import { useAuth } from "@/context/auth-context";
 import { requireAuth } from "@/lib/auth-guards";
 import {
   createAccount,
+  createCategory,
   createTelegramLinkCode,
   getAccounts,
+  getCategories,
   updateMonthlyBaseIncome,
   type AccountResponse,
+  type CategoryResponse,
+  type CategoryType,
 } from "@/lib/auth-api";
 import { ApiError } from "@/lib/api";
-import { hasCompletedOnboarding } from "@/lib/onboarding";
 
 export const Route = createFileRoute("/onboarding")({
   beforeLoad: requireAuth,
@@ -33,7 +35,7 @@ export const Route = createFileRoute("/onboarding")({
   component: OnboardingPage,
 });
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 4;
 
 const slideVariants = {
   enter: (dir: number) => ({ x: dir > 0 ? 80 : -80, opacity: 0 }),
@@ -50,19 +52,32 @@ function OnboardingPage() {
   const [accountName, setAccountName] = useState("");
   const [copied, setCopied] = useState(false);
   const [accounts, setAccounts] = useState<AccountResponse[]>([]);
+  const [categories, setCategories] = useState<CategoryResponse[]>([]);
   const [telegramCode, setTelegramCode] = useState("");
   const [telegramCodeExpiresAt, setTelegramCodeExpiresAt] = useState<string | null>(null);
   const [isPreparing, setIsPreparing] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const next = () => { setDirection(1); setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1)); };
-  const prev = () => { setDirection(-1); setStep((s) => Math.max(s - 1, 0)); };
+  const next = () => {
+    setDirection(1);
+    setStep((currentStep) => Math.min(currentStep + 1, TOTAL_STEPS - 1));
+  };
+
+  const prev = () => {
+    setDirection(-1);
+    setStep((currentStep) => Math.max(currentStep - 1, 0));
+  };
 
   const copyCode = () => {
     navigator.clipboard.writeText(telegramCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const skipTelegramSetup = async () => {
+    await navigate({ to: "/dashboard" });
   };
 
   useEffect(() => {
@@ -87,20 +102,19 @@ function OnboardingPage() {
       setError(null);
 
       try {
-        const accountList = await getAccounts();
+        const [accountList, categoryList] = await Promise.all([
+          getAccounts(),
+          getCategories(),
+        ]);
 
         if (!active) {
           return;
         }
 
         setAccounts(accountList);
+        setCategories(categoryList);
         setIncome(user.monthlyBaseIncome ? String(user.monthlyBaseIncome) : "");
         setAccountName(accountList[0]?.name ?? "");
-
-        if (hasCompletedOnboarding(user, accountList)) {
-          await navigate({ to: "/dashboard" });
-          return;
-        }
 
         const hasActiveTelegramCode =
           !!user.telegramLinkCode &&
@@ -119,12 +133,11 @@ function OnboardingPage() {
 
           setTelegramCode(linkCode.telegramLinkCode);
           setTelegramCodeExpiresAt(linkCode.expiresAt);
-
-          setUser({
-            ...user,
+          setUser((currentUser) => currentUser ? ({
+            ...currentUser,
             telegramLinkCode: linkCode.telegramLinkCode,
             telegramLinkCodeExpiresAt: linkCode.expiresAt,
-          });
+          }) : currentUser);
         }
       } catch (loadError) {
         if (active) {
@@ -142,26 +155,46 @@ function OnboardingPage() {
     return () => {
       active = false;
     };
-  }, [navigate, setUser, user]);
+  }, [setUser, user]);
+
+  const handleAddCategory = async (name: string, type: CategoryType) => {
+    setError(null);
+    setIsCreatingCategory(true);
+
+    try {
+      const createdCategory = await createCategory(name, type);
+      setCategories((currentCategories) => [...currentCategories, createdCategory].sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (createError) {
+      setError(createError instanceof ApiError ? createError.message : "Não foi possível criar a categoria.");
+    } finally {
+      setIsCreatingCategory(false);
+    }
+  };
 
   const handleContinue = async () => {
     setError(null);
 
-    if (step === 1) {
+    if (step === 0) {
       if (!income.trim() || Number(income) <= 0) {
         setError("Informe uma renda mensal válida.");
         return;
       }
+
+      next();
+      return;
     }
 
-    if (step === 2) {
+    if (step === 1) {
       if (!accountName.trim()) {
         setError("Informe o nome da sua conta principal.");
         return;
       }
+
+      next();
+      return;
     }
 
-    if (step === 3) {
+    if (step === 2) {
       setIsSaving(true);
 
       try {
@@ -200,21 +233,17 @@ function OnboardingPage() {
           }) : currentUser);
         }
 
-        if (hasCompletedOnboarding(refreshedUser ?? user, nextAccounts)) {
-          next();
-          return;
-        }
-
         next();
       } catch (saveError) {
         setError(saveError instanceof ApiError ? saveError.message : "Não foi possível salvar sua configuração.");
-        return;
       } finally {
         setIsSaving(false);
       }
-    } else {
-      next();
+
+      return;
     }
+
+    await navigate({ to: "/dashboard" });
   };
 
   const expiresAtLabel = useMemo(() => {
@@ -237,12 +266,18 @@ function OnboardingPage() {
   }, [telegramCodeExpiresAt]);
 
   const stepContent = [
-    <StepWelcome key="welcome" />,
     <StepIncome key="income" income={income} setIncome={setIncome} />,
     <StepAccount key="account" accountName={accountName} setAccountName={setAccountName} />,
-    <StepConfirmation key="confirm" income={income} accountName={accountName} />,
-    <StepCode key="code" code={telegramCode} copied={copied} onCopy={copyCode} expiresAtLabel={expiresAtLabel} />,
-    <StepConnect key="connect" code={telegramCode} copied={copied} onCopy={copyCode} />,
+    <StepCategories
+      key="categories"
+      categories={categories}
+      onAddCategory={handleAddCategory}
+      isCreating={isCreatingCategory}
+    />,
+    <div key="telegram" className="space-y-8">
+      <StepCode code={telegramCode} copied={copied} onCopy={copyCode} expiresAtLabel={expiresAtLabel} />
+      <StepConnect code={telegramCode} copied={copied} onCopy={copyCode} />
+    </div>,
   ];
 
   const isLast = step === TOTAL_STEPS - 1;
@@ -261,7 +296,7 @@ function OnboardingPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-center py-6 px-4">
-        <div className="flex items-center gap-2 text-primary font-bold text-lg" style={{ fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif' }}>
+        <div className="flex items-center gap-2 text-primary font-bold text-lg" style={{ fontFamily: "Plus Jakarta Sans, system-ui, sans-serif" }}>
           <Bot className="w-6 h-6" />
           Finance Bot
         </div>
@@ -301,18 +336,24 @@ function OnboardingPage() {
           ) : (
             <div />
           )}
+
           {!isLast ? (
             <Button variant="hero" onClick={() => void handleContinue()} className="gap-2 h-11 px-6 rounded-xl" disabled={isSaving}>
               {isSaving ? "Salvando..." : "Continuar"} <ArrowRight className="w-4 h-4" />
             </Button>
           ) : (
-            <Button
-              variant="success"
-              onClick={() => navigate({ to: "/dashboard" })}
-              className="gap-2 h-11 px-6 rounded-xl"
-            >
-              Ir para o painel <ArrowRight className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" onClick={() => void skipTelegramSetup()} className="h-11 px-6 rounded-xl">
+                Pular por agora
+              </Button>
+              <Button
+                variant="success"
+                onClick={() => void handleContinue()}
+                className="gap-2 h-11 px-6 rounded-xl"
+              >
+                Ir para o painel <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
           )}
         </motion.div>
       </div>

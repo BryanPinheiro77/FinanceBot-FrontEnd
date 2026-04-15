@@ -46,6 +46,15 @@ export interface AccountResponse {
   createdAt: string;
 }
 
+export type CategoryType = "INCOME" | "EXPENSE";
+
+export interface CategoryResponse {
+  id: number;
+  name: string;
+  type: CategoryType;
+  createdAt: string;
+}
+
 export async function loginRequest(payload: LoginPayload) {
   return apiRequest<AuthResponse>("/auth/login", {
     method: "POST",
@@ -89,5 +98,19 @@ export async function createAccount(name: string) {
 export async function createTelegramLinkCode() {
   return apiRequest<TelegramLinkCodeResponse>("/users/me/telegram-link-code", {
     method: "POST",
+  });
+}
+
+export async function getCategories() {
+  return apiRequest<CategoryResponse[]>("/categories");
+}
+
+export async function createCategory(name: string, type: CategoryType) {
+  return apiRequest<CategoryResponse>("/categories", {
+    method: "POST",
+    body: JSON.stringify({
+      name,
+      type,
+    }),
   });
 }
