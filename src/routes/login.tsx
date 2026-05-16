@@ -22,6 +22,7 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const navigate = useNavigate();
   const { login, isLoading: isAuthLoading } = useAuth();
+
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState<string | null>(null);
@@ -29,17 +30,28 @@ function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     setError(null);
     setIsSubmitting(true);
 
     try {
-      await login({
+      const currentUser = await login({
         email: form.email.trim(),
         password: form.password,
       });
-      await navigate({ to: "/onboarding" });
+
+      const hasIncomeConfigured =
+        !!currentUser.monthlyBaseIncome && currentUser.monthlyBaseIncome > 0;
+
+      await navigate({
+        to: hasIncomeConfigured ? "/dashboard" : "/onboarding",
+      });
     } catch (submitError) {
-      setError(submitError instanceof ApiError ? submitError.message : "Não foi possível entrar agora.");
+      setError(
+        submitError instanceof ApiError
+          ? submitError.message
+          : "Não foi possível entrar agora.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -58,11 +70,15 @@ function LoginPage() {
             required
           />
         </div>
+
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-foreground">Senha</label>
-            <button type="button" className="text-xs text-primary hover:underline">Esqueceu a senha?</button>
+            <button type="button" className="text-xs text-primary hover:underline">
+              Esqueceu a senha?
+            </button>
           </div>
+
           <div className="relative">
             <Input
               type={showPassword ? "text" : "password"}
@@ -71,12 +87,17 @@ function LoginPage() {
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               required
             />
+
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
             >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {showPassword ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
             </button>
           </div>
         </div>
