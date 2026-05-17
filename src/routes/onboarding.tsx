@@ -12,6 +12,7 @@ import { StepConnect } from "@/components/onboarding/StepConnect";
 import { useAuth } from "@/context/auth-context";
 import { requireAuth } from "@/lib/auth-guards";
 import {
+  completeOnboarding,
   createAccount,
   createCategory,
   createTelegramLinkCode,
@@ -46,6 +47,7 @@ const slideVariants = {
 function OnboardingPage() {
   const navigate = useNavigate();
   const { user, isLoading, setUser, refreshUser } = useAuth();
+
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
   const [income, setIncome] = useState("");
@@ -76,8 +78,33 @@ function OnboardingPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const finishOnboarding = async () => {
+    setError(null);
+    setIsSaving(true);
+
+    try {
+      await completeOnboarding();
+
+      const refreshedUser = await refreshUser();
+
+      if (refreshedUser) {
+        setUser(refreshedUser);
+      }
+
+      await navigate({ to: "/dashboard" });
+    } catch (finishError) {
+      setError(
+        finishError instanceof ApiError
+          ? finishError.message
+          : "Não foi possível finalizar sua configuração.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const skipTelegramSetup = async () => {
-    await navigate({ to: "/dashboard" });
+    await finishOnboarding();
   };
 
   useEffect(() => {
@@ -133,15 +160,23 @@ function OnboardingPage() {
 
           setTelegramCode(linkCode.telegramLinkCode);
           setTelegramCodeExpiresAt(linkCode.expiresAt);
-          setUser((currentUser) => currentUser ? ({
-            ...currentUser,
-            telegramLinkCode: linkCode.telegramLinkCode,
-            telegramLinkCodeExpiresAt: linkCode.expiresAt,
-          }) : currentUser);
+          setUser((currentUser) =>
+            currentUser
+              ? {
+                  ...currentUser,
+                  telegramLinkCode: linkCode.telegramLinkCode,
+                  telegramLinkCodeExpiresAt: linkCode.expiresAt,
+                }
+              : currentUser,
+          );
         }
       } catch (loadError) {
         if (active) {
-          setError(loadError instanceof ApiError ? loadError.message : "Não foi possível carregar a configuração inicial.");
+          setError(
+            loadError instanceof ApiError
+              ? loadError.message
+              : "Não foi possível carregar a configuração inicial.",
+          );
         }
       } finally {
         if (active) {
@@ -163,9 +198,18 @@ function OnboardingPage() {
 
     try {
       const createdCategory = await createCategory(name, type);
-      setCategories((currentCategories) => [...currentCategories, createdCategory].sort((a, b) => a.name.localeCompare(b.name)));
+
+      setCategories((currentCategories) =>
+        [...currentCategories, createdCategory].sort((a, b) =>
+          a.name.localeCompare(b.name),
+        ),
+      );
     } catch (createError) {
-      setError(createError instanceof ApiError ? createError.message : "Não foi possível criar a categoria.");
+      setError(
+        createError instanceof ApiError
+          ? createError.message
+          : "Não foi possível criar a categoria.",
+      );
     } finally {
       setIsCreatingCategory(false);
     }
@@ -205,7 +249,8 @@ function OnboardingPage() {
         }
 
         const hasAccountWithSameName = accounts.some(
-          (account) => account.name.trim().toLowerCase() === accountName.trim().toLowerCase(),
+          (account) =>
+            account.name.trim().toLowerCase() === accountName.trim().toLowerCase(),
         );
 
         let nextAccounts = accounts;
@@ -224,18 +269,28 @@ function OnboardingPage() {
 
         if (!telegramCode) {
           const linkCode = await createTelegramLinkCode();
+
           setTelegramCode(linkCode.telegramLinkCode);
           setTelegramCodeExpiresAt(linkCode.expiresAt);
-          setUser((currentUser) => currentUser ? ({
-            ...currentUser,
-            telegramLinkCode: linkCode.telegramLinkCode,
-            telegramLinkCodeExpiresAt: linkCode.expiresAt,
-          }) : currentUser);
+
+          setUser((currentUser) =>
+            currentUser
+              ? {
+                  ...currentUser,
+                  telegramLinkCode: linkCode.telegramLinkCode,
+                  telegramLinkCodeExpiresAt: linkCode.expiresAt,
+                }
+              : currentUser,
+          );
         }
 
         next();
       } catch (saveError) {
-        setError(saveError instanceof ApiError ? saveError.message : "Não foi possível salvar sua configuração.");
+        setError(
+          saveError instanceof ApiError
+            ? saveError.message
+            : "Não foi possível salvar sua configuração.",
+        );
       } finally {
         setIsSaving(false);
       }
@@ -243,7 +298,7 @@ function OnboardingPage() {
       return;
     }
 
-    await navigate({ to: "/dashboard" });
+    await finishOnboarding();
   };
 
   const expiresAtLabel = useMemo(() => {
@@ -275,7 +330,12 @@ function OnboardingPage() {
       isCreating={isCreatingCategory}
     />,
     <div key="telegram" className="space-y-8">
-      <StepCode code={telegramCode} copied={copied} onCopy={copyCode} expiresAtLabel={expiresAtLabel} />
+      <StepCode
+        code={telegramCode}
+        copied={copied}
+        onCopy={copyCode}
+        expiresAtLabel={expiresAtLabel}
+      />
       <StepConnect code={telegramCode} copied={copied} onCopy={copyCode} />
     </div>,
   ];
@@ -286,8 +346,12 @@ function OnboardingPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
         <div className="text-center">
-          <p className="text-lg font-semibold text-foreground">Carregando sua configuração...</p>
-          <p className="text-sm text-muted-foreground mt-2">Aguarde um instante.</p>
+          <p className="text-lg font-semibold text-foreground">
+            Carregando sua configuração...
+          </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Aguarde um instante.
+          </p>
         </div>
       </div>
     );
@@ -295,8 +359,15 @@ function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-center py-6 px-4">
-        <div className="flex items-center gap-2 text-primary font-bold text-lg" style={{ fontFamily: "Plus Jakarta Sans, system-ui, sans-serif" }}>
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-center py-6 px-4"
+      >
+        <div
+          className="flex items-center gap-2 text-primary font-bold text-lg"
+          style={{ fontFamily: "Plus Jakarta Sans, system-ui, sans-serif" }}
+        >
           <Bot className="w-6 h-6" />
           Finance Bot
         </div>
@@ -328,9 +399,19 @@ function OnboardingPage() {
           </div>
         ) : null}
 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="flex items-center justify-between w-full max-w-md mt-8 gap-4">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="flex items-center justify-between w-full max-w-md mt-8 gap-4"
+        >
           {step > 0 ? (
-            <Button variant="ghost" onClick={prev} className="gap-2">
+            <Button
+              variant="ghost"
+              onClick={prev}
+              className="gap-2"
+              disabled={isSaving}
+            >
               <ArrowLeft className="w-4 h-4" /> Voltar
             </Button>
           ) : (
@@ -338,20 +419,34 @@ function OnboardingPage() {
           )}
 
           {!isLast ? (
-            <Button variant="hero" onClick={() => void handleContinue()} className="gap-2 h-11 px-6 rounded-xl" disabled={isSaving}>
-              {isSaving ? "Salvando..." : "Continuar"} <ArrowRight className="w-4 h-4" />
+            <Button
+              variant="hero"
+              onClick={() => void handleContinue()}
+              className="gap-2 h-11 px-6 rounded-xl"
+              disabled={isSaving}
+            >
+              {isSaving ? "Salvando..." : "Continuar"}{" "}
+              <ArrowRight className="w-4 h-4" />
             </Button>
           ) : (
             <div className="flex items-center gap-3">
-              <Button variant="outline" onClick={() => void skipTelegramSetup()} className="h-11 px-6 rounded-xl">
+              <Button
+                variant="outline"
+                onClick={() => void skipTelegramSetup()}
+                className="h-11 px-6 rounded-xl"
+                disabled={isSaving}
+              >
                 Pular por agora
               </Button>
+
               <Button
                 variant="success"
                 onClick={() => void handleContinue()}
                 className="gap-2 h-11 px-6 rounded-xl"
+                disabled={isSaving}
               >
-                Ir para o painel <ArrowRight className="w-4 h-4" />
+                {isSaving ? "Finalizando..." : "Ir para o painel"}{" "}
+                <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
           )}

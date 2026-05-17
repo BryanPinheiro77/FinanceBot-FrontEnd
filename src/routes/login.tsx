@@ -40,11 +40,8 @@ function LoginPage() {
         password: form.password,
       });
 
-      const hasIncomeConfigured =
-        !!currentUser.monthlyBaseIncome && currentUser.monthlyBaseIncome > 0;
-
       await navigate({
-        to: hasIncomeConfigured ? "/dashboard" : "/onboarding",
+        to: currentUser.onboardingCompleted ? "/dashboard" : "/onboarding",
       });
     } catch (submitError) {
       setError(

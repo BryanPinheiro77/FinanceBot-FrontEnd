@@ -14,6 +14,7 @@ export interface CurrentUser {
   name: string;
   email: string;
   monthlyBaseIncome: number | null;
+  onboardingCompleted: boolean;
   telegramId: number | null;
   telegramLinked: boolean;
   telegramLinkCode: string | null;
@@ -77,6 +78,12 @@ export async function updateMonthlyBaseIncome(monthlyBaseIncome: number) {
   return apiRequest<void>("/users/me/monthly-base-income", {
     method: "PATCH",
     body: JSON.stringify({ monthlyBaseIncome }),
+  });
+}
+
+export async function completeOnboarding() {
+  return apiRequest<void>("/users/me/onboarding-completed", {
+    method: "PATCH",
   });
 }
 
