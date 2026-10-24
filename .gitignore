@@ -33,3 +33,6 @@ dist-ssr
 
 .codex
 .env
+# Evidências locais de testes de navegador
+/test-results/
+/playwright-report/

@@ -1,214 +1,318 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Bot, MessageSquare, Shield, Zap, ArrowRight, Wallet, Sun, Moon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useTheme } from "@/hooks/use-theme";
-import { motion } from "framer-motion";
+import { FinanceStory } from '@/components/FinanceStory'
+import type { MouseEvent } from 'react'
+import { useThemeTransition } from '@/hooks/use-theme-transition'
+import { LandingCapabilities, LandingFAQ } from '@/components/LandingDetails'
+import { useLandingMotion } from '@/hooks/use-landing-motion'
+import { useHydrated } from '@/hooks/use-hydrated'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUpRight,
+  Bot,
+  Check as CheckIcon,
+  Github,
+  Moon,
+  MessageSquare,
+  Wallet,
+  Zap,
+  Sun,
+} from 'lucide-react'
+import { useTheme } from '@/hooks/use-theme'
+import { MessageDemo } from '@/components/LandingExperience'
+import '../landing.css'
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute('/')({
+  validateSearch: (search: Record<string, unknown>): { animacao?: 'off' } => ({
+    animacao: search.animacao === 'off' ? 'off' : undefined,
+  }),
   head: () => ({
     meta: [
-      { title: "Finance Bot — Gerencie finanças pelo Telegram" },
-      { name: "description", content: "Plataforma de gestão financeira pessoal integrada ao Telegram. Registre gastos, consulte saldos e organize suas finanças por mensagem." },
-      { property: "og:title", content: "Finance Bot — Gerencie finanças pelo Telegram" },
-      { property: "og:description", content: "Registre gastos, consulte saldos e organize suas finanças direto pelo Telegram." },
+      { title: 'Finance Bot — Uma conversa. Mais controle.' },
+      {
+        name: 'description',
+        content:
+          'Registre gastos e organize suas finanças pelo Telegram. Conheça o Finance Bot e experimente uma demonstração interativa.',
+      },
+      {
+        property: 'og:title',
+        content: 'Finance Bot — Uma conversa. Mais controle.',
+      },
+      {
+        property: 'og:description',
+        content: 'Suas finanças começam com uma mensagem no Telegram.',
+      },
     ],
   }),
   component: LandingPage,
-});
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.1, duration: 0.5, ease: "easeOut" as const },
-  }),
-};
+})
 
 function LandingPage() {
-  const { theme, toggleTheme } = useTheme();
-
+  const { animacao } = Route.useSearch()
+  const motionRef = useLandingMotion()
+  const hydrated = useHydrated()
+  const { theme, toggleTheme } = useTheme()
+  const themeTransition = useThemeTransition(toggleTheme)
+  const centerDemo = (event: MouseEvent<HTMLAnchorElement>) => {
+    const demo = motionRef.current?.querySelector<HTMLElement>(
+      animacao === 'off' ? '.hero-demo' : '.story-stage',
+    )
+    if (!demo) return
+    event.preventDefault()
+    let top = 0
+    let node: HTMLElement | null = demo
+    while (node) {
+      top += node.offsetTop
+      node = node.offsetParent as HTMLElement | null
+    }
+    const padding =
+      animacao === 'off'
+        ? Math.max(24, (window.innerHeight - demo.offsetHeight) / 2)
+        : 0
+    window.scrollTo({
+      top: top - padding,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'instant'
+        : 'smooth',
+    })
+  }
   return (
-    <div className="min-h-screen bg-background">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-6 sm:px-12 py-5 max-w-6xl mx-auto">
-        <div className="flex items-center gap-2 text-primary font-bold text-xl" style={{ fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif' }}>
-          <Bot className="w-7 h-7" />
+    <div className="landing" ref={motionRef}>
+      <a className="skip-link" href="#conteudo">
+        Pular para o conteúdo
+      </a>
+      <header className="landing-header">
+        <Link
+          to="/"
+          className="landing-brand"
+          aria-label="Finance Bot — início"
+        >
+          <Bot aria-hidden="true" />
           Finance Bot
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Alternar tema">
-            {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/login">Entrar</Link>
-          </Button>
-          <Button variant="hero" size="lg" asChild>
-            <Link to="/cadastro">Começar grátis</Link>
-          </Button>
-        </div>
-      </nav>
-
-      {/* Hero */}
-      <section className="px-6 sm:px-12 pt-16 pb-24 max-w-6xl mx-auto">
-        <div className="max-w-2xl mx-auto text-center">
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            custom={0}
-            variants={fadeUp}
-            className="inline-flex items-center gap-2 bg-accent text-accent-foreground px-4 py-1.5 rounded-full text-sm font-medium mb-6"
+          <span className="brand-dot" />
+        </Link>
+        <nav aria-label="Navegação principal">
+          <a className="nav-explore" href="#comecar">
+            Como funciona
+          </a>
+          <button
+            className="theme-button"
+            disabled={!hydrated || themeTransition.changing}
+            onClick={themeTransition.toggle}
+            aria-label={
+              theme === 'light' ? 'Ativar tema escuro' : 'Ativar tema claro'
+            }
           >
-            <MessageSquare className="w-4 h-4" />
-            Integração com Telegram
-          </motion.div>
-
-          <motion.h1
-            initial="hidden"
-            animate="visible"
-            custom={1}
-            variants={fadeUp}
-            className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-foreground leading-tight mb-6"
-            style={{ fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif' }}
-          >
-            Suas finanças no{" "}
-            <span className="text-primary">controle</span>,{" "}
-            direto do Telegram
-          </motion.h1>
-
-          <motion.p
-            initial="hidden"
-            animate="visible"
-            custom={2}
-            variants={fadeUp}
-            className="text-lg text-muted-foreground max-w-lg mx-auto mb-10 leading-relaxed"
-          >
-            Registre gastos, consulte saldos e organize suas finanças pessoais com linguagem natural. Sem planilhas, sem complicação.
-          </motion.p>
-
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            custom={3}
-            variants={fadeUp}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
-          >
-            <Button variant="hero" size="lg" className="h-12 px-8 rounded-xl" asChild>
-              <Link to="/cadastro">
-                Criar conta gratuita
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Link>
-            </Button>
-            <Button variant="heroOutline" size="lg" className="h-12 px-8 rounded-xl" asChild>
-              <Link to="/login">Já tenho conta</Link>
-            </Button>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="px-6 sm:px-12 pb-24 max-w-6xl mx-auto">
-        <div className="grid sm:grid-cols-3 gap-6">
-          {[
-            {
-              icon: MessageSquare,
-              title: "Linguagem natural",
-              desc: "Envie mensagens como \"gastei 50 no mercado\" e o bot registra automaticamente.",
-            },
-            {
-              icon: Shield,
-              title: "Seguro e privado",
-              desc: "Seus dados financeiros protegidos com criptografia e acesso exclusivo.",
-            },
-            {
-              icon: Zap,
-              title: "Setup em minutos",
-              desc: "Cadastre-se, conecte o Telegram e comece a usar. Sem burocracia.",
-            },
-          ].map((feature, i) => (
-            <motion.div
-              key={feature.title}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-40px" }}
-              custom={i}
-              variants={fadeUp}
-              className="bg-card rounded-2xl p-8 border border-border/60 hover:shadow-lg transition-shadow duration-300"
-            >
-              <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center mb-5">
-                <feature.icon className="w-6 h-6 text-primary" />
+            {theme === 'light' ? <Moon size={19} /> : <Sun size={19} />}
+          </button>
+          <Link to="/login" className="nav-login">
+            Entrar <ArrowUpRight size={16} aria-hidden="true" />
+          </Link>
+        </nav>
+      </header>
+      <main id="conteudo">
+        <section className="landing-hero">
+          <div className="hero-copy">
+            <h1 data-reveal="title">
+              Suas finanças no <span>controle,</span>
+              <br />
+              direto do Telegram.
+            </h1>
+            <div className="hero-description">
+              <p>
+                Registre gastos, consulte saldos e organize suas finanças
+                pessoais com linguagem natural. Sem planilhas, sem complicação.
+              </p>
+              <div className="hero-actions">
+                <Link to="/cadastro" className="landing-button">
+                  Criar minha conta <ArrowRight size={19} aria-hidden="true" />
+                </Link>
+                <Link to="/login" className="secondary-button">
+                  Já tenho conta <ArrowUpRight size={17} aria-hidden="true" />
+                </Link>
               </div>
-              <h3 className="text-lg font-semibold text-foreground mb-2" style={{ fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif' }}>
-                {feature.title}
-              </h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">{feature.desc}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className="px-6 sm:px-12 pb-24 max-w-6xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl font-bold text-center text-foreground mb-12" style={{ fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif' }}>
-          Como funciona
-        </h2>
-        <div className="grid sm:grid-cols-3 gap-8 max-w-3xl mx-auto">
-          {[
-            { step: "1", title: "Crie sua conta", desc: "Cadastro rápido e gratuito em poucos segundos." },
-            { step: "2", title: "Conecte o Telegram", desc: "Use o código gerado para vincular ao nosso bot." },
-            { step: "3", title: "Comece a registrar", desc: "Envie mensagens e gerencie suas finanças." },
-          ].map((item, i) => (
-            <motion.div
-              key={item.step}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              custom={i}
-              variants={fadeUp}
-              className="text-center"
-            >
-              <div className="w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xl font-bold mx-auto mb-4">
-                {item.step}
+              <a
+                href={
+                  animacao === 'off' ? '#como-funciona' : '#historia-financebot'
+                }
+                className="text-link demo-anchor"
+                onClick={centerDemo}
+              >
+                <MessageSquare size={16} aria-hidden="true" />
+                {animacao === 'off'
+                  ? 'Experimente uma conversa abaixo'
+                  : 'Veja a história em movimento'}
+                <ArrowDown size={15} aria-hidden="true" />
+              </a>
+            </div>
+          </div>
+          {animacao !== 'off' ? (
+            <FinanceStory />
+          ) : (
+            <>
+              <div className="hero-demo" id="como-funciona" data-reveal="demo">
+                <MessageDemo />
               </div>
-              <h3 className="font-semibold text-foreground mb-1" style={{ fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif' }}>{item.title}</h3>
-              <p className="text-sm text-muted-foreground">{item.desc}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="px-6 sm:px-12 pb-24 max-w-6xl mx-auto">
-        <div className="bg-primary rounded-3xl p-10 sm:p-16 text-center relative overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_oklch(0.55_0.14_180_/_0.3),_transparent_60%)]" />
-          <div className="relative z-10">
-            <Wallet className="w-10 h-10 text-primary-foreground/80 mx-auto mb-4" />
-            <h2 className="text-2xl sm:text-3xl font-bold text-primary-foreground mb-3" style={{ fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif' }}>
-              Pronto para organizar suas finanças?
+              <div className="hero-bottom">
+                <span>
+                  Menos trabalho para registrar.
+                  <br />
+                  <strong>Mais clareza para seguir.</strong>
+                </span>
+                <span>
+                  Explore os exemplos acima.
+                  <br />
+                  Nenhum dado real é enviado.
+                </span>
+              </div>
+            </>
+          )}
+        </section>
+        <section
+          id="recursos"
+          className="features-section"
+          aria-labelledby="features-title"
+        >
+          <div className="section-heading">
+            <h2 id="features-title">
+              Menos complicação.
+              <br />
+              Mais controle no dia a dia.
             </h2>
-            <p className="text-primary-foreground/80 mb-8 max-w-md mx-auto">
-              Comece agora gratuitamente e tenha controle total direto pelo Telegram.
+            <p>
+              Da mensagem ao registro, um jeito simples de cuidar das suas
+              finanças.
             </p>
-            <Button variant="secondary" size="lg" className="h-12 px-8 rounded-xl font-semibold" asChild>
-              <Link to="/cadastro">
-                Criar conta grátis
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Link>
-            </Button>
           </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border px-6 sm:px-12 py-8 max-w-6xl mx-auto">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2 font-semibold text-foreground" style={{ fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif' }}>
-            <Bot className="w-5 h-5 text-primary" />
-            Finance Bot
+          <div className="feature-grid">
+            <article
+              className="feature-card feature-natural"
+              data-reveal="card"
+            >
+              <MessageSquare aria-hidden="true" />
+              <h3>Linguagem natural</h3>
+              <p>
+                Envie mensagens como “gastei 50 no mercado” e registre o que
+                aconteceu sem preencher uma planilha.
+              </p>
+              <div className="feature-message">
+                <span>Você</span>
+                <p>Gastei 50 no mercado</p>
+                <CheckIcon />
+              </div>
+            </article>
+            <article
+              className="feature-card"
+              data-reveal="card"
+              data-delay="80"
+            >
+              <Wallet aria-hidden="true" />
+              <h3>Seus registros organizados</h3>
+              <p>
+                Entradas e saídas em um só lugar, para consultar seus registros
+                e acompanhar suas finanças.
+              </p>
+              <span className="feature-caption">
+                Uma conta. Sua rotina financeira.
+              </span>
+            </article>
+            <article
+              className="feature-card"
+              data-reveal="card"
+              data-delay="160"
+            >
+              <Zap aria-hidden="true" />
+              <h3>Setup simples</h3>
+              <p>
+                Cadastre-se, conecte o Telegram e comece a registrar. Um passo
+                de cada vez.
+              </p>
+              <a className="text-link" href="#comecar">
+                Veja como começar <ArrowRight size={16} aria-hidden="true" />
+              </a>
+            </article>
           </div>
-          <p>© 2026 Finance Bot. Todos os direitos reservados.</p>
-        </div>
+        </section>
+        <LandingCapabilities />
+        <section
+          className="start-section"
+          id="comecar"
+          aria-labelledby="start-title"
+        >
+          <div>
+            <h2 id="start-title">Como funciona</h2>
+            <p>Da criação da conta à primeira mensagem.</p>
+          </div>
+          <ol>
+            <li data-reveal="step" data-delay="0">
+              <span>1</span>
+              <div>
+                <h3>Crie sua conta</h3>
+                <p>
+                  Faça seu cadastro para começar a organizar seus registros.
+                </p>
+              </div>
+            </li>
+            <li data-reveal="step" data-delay="110">
+              <span>2</span>
+              <div>
+                <h3>Conecte o Telegram</h3>
+                <p>Use o código gerado na sua conta para vincular o bot.</p>
+              </div>
+            </li>
+            <li data-reveal="step" data-delay="220">
+              <span>3</span>
+              <div>
+                <h3>Comece a registrar</h3>
+                <p>Envie mensagens e acompanhe suas entradas e saídas.</p>
+              </div>
+            </li>
+          </ol>
+        </section>
+        <section className="open-section">
+          <Github size={28} aria-hidden="true" />
+          <div>
+            <h2>Um projeto aberto para evoluir com você.</h2>
+            <p>
+              O Finance Bot é um assistente de finanças pessoais de código
+              aberto. Conheça o desenvolvimento, sugira melhorias ou execute sua
+              própria instalação seguindo a documentação do projeto.
+            </p>
+          </div>
+          <a
+            href="https://github.com/BryanPinheiro77/FinanceBot-BackEnd"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Conhecer o projeto <ArrowUpRight size={18} aria-hidden="true" />
+            <span className="sr-only"> (abre em nova aba)</span>
+          </a>
+        </section>
+        <LandingFAQ />
+        <section className="closing-section" data-reveal="closing">
+          <Wallet size={30} aria-hidden="true" />
+          <h2>
+            Pronto para organizar
+            <br />
+            suas finanças?
+          </h2>
+          <p>Comece com uma conta. Continue com uma conversa.</p>
+          <Link to="/cadastro" className="landing-button">
+            Criar minha conta <ArrowRight size={20} aria-hidden="true" />
+          </Link>
+          <Link to="/login" className="text-link">
+            Já tenho uma conta <ArrowUpRight size={16} aria-hidden="true" />
+          </Link>
+        </section>
+      </main>
+      <footer className="landing-footer">
+        <Link to="/" className="landing-brand">
+          <Bot aria-hidden="true" />
+          Finance Bot
+        </Link>
+        <p>Finanças pessoais. Conversas simples.</p>
+        <span>© 2026 Finance Bot</span>
       </footer>
     </div>
-  );
+  )
 }
