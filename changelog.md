@@ -13,6 +13,9 @@
 - Código dinâmico de vínculo com Telegram
 - Dashboard inicial com dados reais básicos
 
+### Security
+- Atualização do TanStack Start para 1.168.60 e do core de servidor para 1.169.39, corrigindo a CVE-2026-102989 que bloqueava os builds na Vercel
+
 ### Changed
 - Apresentação da landing, sombras dos cards e transição entre temas claro e escuro
 - Textos de segurança alinhados às proteções atualmente implementadas

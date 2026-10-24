@@ -36,3 +36,5 @@ dist-ssr
 # Evidências locais de testes de navegador
 /test-results/
 /playwright-report/
+.vercel
+.env*
