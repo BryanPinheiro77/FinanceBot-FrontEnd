@@ -1,6 +1,6 @@
-import { clearStoredToken, getStoredToken } from "@/lib/token-storage";
+import { clearLegacyAuthToken } from "@/lib/legacy-auth-storage";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+const API_BASE_URL = "/api/financebot";
 
 export interface ApiErrorPayload {
   title?: string;
@@ -45,20 +45,21 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 export async function apiRequest<T>(path: string, init: RequestInit = {}) {
-  const token = getStoredToken();
+  clearLegacyAuthToken();
   const headers = new Headers(init.headers);
 
   if (init.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
-  if (token && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
+  headers.delete("Authorization");
+  headers.set("X-FinanceBot-CSRF", "1");
 
   const response = await fetch(buildUrl(path), {
     ...init,
     headers,
+    credentials: "same-origin",
+    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -71,7 +72,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}) {
     }
 
     if (response.status === 401) {
-      clearStoredToken();
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("financebot:session-expired"));
     }
 
     throw new ApiError(

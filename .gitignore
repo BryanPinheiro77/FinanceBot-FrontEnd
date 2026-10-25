@@ -38,3 +38,4 @@ dist-ssr
 /playwright-report/
 .vercel
 .env*
+!.env.example

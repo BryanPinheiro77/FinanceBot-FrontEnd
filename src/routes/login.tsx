@@ -60,6 +60,7 @@ function LoginPage() {
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground">E-mail</label>
           <Input
+            disabled={isAuthLoading || isSubmitting}
             type="email"
             placeholder="joao@email.com"
             value={form.email}
@@ -78,6 +79,7 @@ function LoginPage() {
 
           <div className="relative">
             <Input
+            disabled={isAuthLoading || isSubmitting}
               type={showPassword ? "text" : "password"}
               placeholder="Sua senha"
               value={form.password}

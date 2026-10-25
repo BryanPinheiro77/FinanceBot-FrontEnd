@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Bot, DollarSign, Building2, CheckCircle, Send, LogOut, Sun, Moon, ExternalLink } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
@@ -112,9 +113,13 @@ function DashboardPage() {
               variant="ghost"
               size="sm"
               className="gap-2 text-muted-foreground"
-              onClick={() => {
-                logout();
-                void navigate({ to: "/" });
+              onClick={async () => {
+                try {
+                  await logout();
+                  await navigate({ to: "/login" });
+                } catch {
+                  toast.error("Não foi possível sair agora. Tente novamente.");
+                }
               }}
             >
               <LogOut className="w-4 h-4" /> Sair

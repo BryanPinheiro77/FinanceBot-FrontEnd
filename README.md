@@ -1,227 +1,60 @@
-Welcome to your new TanStack Start app! 
+# FinanceBot Web
 
-# Getting Started
+Frontend do FinanceBot com React, TypeScript, TanStack Start/Router, Vite e Tailwind.
+API e bot são mantidos em [FinanceBot-BackEnd](https://github.com/BryanPinheiro77/FinanceBot-BackEnd).
+Este projeto possui runtime de servidor; não deve ser publicado como SPA estática.
 
-To run this application:
+## Desenvolvimento
+
+Requer Node compatível com Vite 8 (o CI usa Node 22), npm e API acessível.
 
 ```bash
-npm install
+npm ci
+cp .env.example .env
 npm run dev
 ```
 
-# Building For Production
+Abrir `http://localhost:3000`. Não usar dados pessoais ou credenciais de produção
+nos testes. Configurações locais ficam fora do Git.
 
-To build this application for production:
+## Sessão web
+
+O navegador chama `/api/financebot/*` na própria origem. O servidor web recebe o
+Bearer da API e guarda em cookie `HttpOnly`, `SameSite=Lax`, host-only e `Secure`
+em produção, sem devolver JWT no JSON. JavaScript não lê o cookie nem mantém
+JWT em localStorage/sessionStorage. Tokens antigos são descartados, exigindo
+novo login. Logout limpa a sessão local; não revoga um JWT já copiado por terceiro.
+
+Mutações exigem origem exata e header próprio; o proxy tem allowlist de rotas,
+não encaminha headers arbitrários, bloqueia redirects do upstream e evita cache
+de dados autenticados. [Configuração, limites e publicação](docs/web-session.md).
+
+## Validação
+
+```bash
+npm test
+npm run build
+npm run test:e2e:session
+```
+
+O smoke de sessão inicia API fictícia em loopback e cobre login/cadastro,
+recarga autenticada, logout, descarte do token antigo e CSRF sem acessar produção.
+Os testes de landing continuam em `npm run test:e2e` (configuração original).
+`npm run lint`, `npm run check` e `npx tsc --noEmit` são verificações adicionais;
+problemas de componentes legados devem ser tratados sem ocultar novas regressões.
+
+## Publicação
+
+A produção é hospedada na Vercel. Cada PR deve ser revisado/testado antes de merge
+na branch de produção; a integração Git pode publicar automaticamente esse merge.
+Configurar variáveis **de servidor**, HTTPS e compatibilidade com a API antes de
+publicar a migração de sessão. Não colocar `JWT_SECRET` ou chaves privadas em
+variáveis `VITE_`. Previews devem usar fixtures ou ambiente isolado.
 
 ```bash
 npm run build
 ```
 
-## Testing
-
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
-
-```bash
-npm run test
-```
-
-## Styling
-
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
-
-### Removing Tailwind CSS
-
-If you prefer not to use Tailwind CSS:
-
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Uninstall the packages: `npm install @tailwindcss/vite tailwindcss -D`
-
-## Linting & Formatting
-
-
-This project uses [eslint](https://eslint.org/) and [prettier](https://prettier.io/) for linting and formatting. Eslint is configured using [tanstack/eslint-config](https://tanstack.com/config/latest/docs/eslint). The following scripts are available:
-
-```bash
-npm run lint
-npm run format
-npm run check
-```
-
-
-## Deploy with Nitro
-
-This project uses Nitro as a generic server adapter, so it can run on any Node-compatible host.
-
-```bash
-npm run build
-node dist/server/index.mjs
-```
-
-The build output is a self-contained Node server. To deploy, push the `dist/` directory to your host (Render, Fly.io, your own VPS, etc.) and run the server command above.
-
-For host-specific presets (Vercel, Netlify, Cloudflare, AWS Lambda, etc.) and tuning, see https://v3.nitro.build/deploy.
-
-
-## Shadcn
-
-Add components using the latest version of [Shadcn](https://ui.shadcn.com/).
-
-```bash
-pnpm dlx shadcn@latest add button
-```
-
-
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'My App' },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-})
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from '@tanstack/react-start'
-
-const getServerTime = createServerFn({
-  method: 'GET',
-}).handler(async () => {
-  return new Date().toISOString()
-})
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState('')
-  
-  useEffect(() => {
-    getServerTime().then(setTime)
-  }, [])
-  
-  return <div>Server time: {time}</div>
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-import { json } from '@tanstack/react-start'
-
-export const Route = createFileRoute('/api/hello')({
-  server: {
-    handlers: {
-      GET: () => json({ message: 'Hello, World!' }),
-    },
-  },
-})
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from '@tanstack/react-router'
-
-export const Route = createFileRoute('/people')({
-  loader: async () => {
-    const response = await fetch('https://swapi.dev/api/people')
-    return response.json()
-  },
-  component: PeopleComponent,
-})
-
-function PeopleComponent() {
-  const data = Route.useLoaderData()
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  )
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+O adapter Nitro gera o output para a plataforma configurada. Em ambiente Node
+compatível, o build padrão pode ser validado com `node .output/server/index.mjs`.
+A publicação e os testes de produção exigem autorização do mantenedor.
