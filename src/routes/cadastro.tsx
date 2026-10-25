@@ -64,6 +64,7 @@ function CadastroPage() {
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground">Nome completo</label>
           <Input
+            disabled={isAuthLoading || isSubmitting}
             placeholder="João Silva"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -73,6 +74,7 @@ function CadastroPage() {
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground">E-mail</label>
           <Input
+            disabled={isAuthLoading || isSubmitting}
             type="email"
             placeholder="joao@email.com"
             value={form.email}
@@ -84,6 +86,7 @@ function CadastroPage() {
           <label className="text-sm font-medium text-foreground">Senha</label>
           <div className="relative">
             <Input
+            disabled={isAuthLoading || isSubmitting}
               type={showPassword ? "text" : "password"}
               placeholder="Mínimo 6 caracteres"
               value={form.password}
@@ -104,6 +107,7 @@ function CadastroPage() {
           <label className="text-sm font-medium text-foreground">Confirmar senha</label>
           <div className="relative">
             <Input
+            disabled={isAuthLoading || isSubmitting}
               type={showConfirm ? "text" : "password"}
               placeholder="Repita sua senha"
               value={form.confirm}

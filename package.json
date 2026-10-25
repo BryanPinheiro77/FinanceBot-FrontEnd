@@ -13,7 +13,8 @@
     "lint": "eslint",
     "format": "prettier --write . && eslint --fix",
     "check": "prettier --check .",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:session": "playwright test --config playwright.session.config.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

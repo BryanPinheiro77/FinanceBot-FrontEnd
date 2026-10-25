@@ -1,14 +1,15 @@
-import { redirect } from "@tanstack/react-router";
-import { getStoredToken } from "@/lib/token-storage";
+import { redirect } from '@tanstack/react-router'
+import { getSessionStatus } from '@/lib/session-status'
 
-export function requireAnonymous() {
-  if (getStoredToken()) {
-    throw redirect({ to: "/onboarding" });
-  }
+export async function requireAnonymous() {
+  const session = await getSessionStatus()
+  if (session.authenticated)
+    throw redirect({
+      to: session.onboardingCompleted ? '/dashboard' : '/onboarding',
+    })
 }
 
-export function requireAuth() {
-  if (!getStoredToken()) {
-    throw redirect({ to: "/login" });
-  }
+export async function requireAuth() {
+  const session = await getSessionStatus()
+  if (!session.authenticated) throw redirect({ to: '/login' })
 }

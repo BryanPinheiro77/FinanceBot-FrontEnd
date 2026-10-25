@@ -1,12 +1,7 @@
 import { apiRequest } from "@/lib/api";
 
 export interface AuthResponse {
-  token: string;
-  type: string;
-  userId: number;
-  name: string;
-  email: string;
-  role: string;
+  authenticated: boolean;
 }
 
 export interface CurrentUser {
@@ -120,4 +115,7 @@ export async function createCategory(name: string, type: CategoryType) {
       type,
     }),
   });
+}
+export async function logoutRequest() {
+  return apiRequest<void>("/auth/logout", { method: "POST" });
 }

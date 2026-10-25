@@ -3,13 +3,12 @@ import type { Dispatch, ReactNode, SetStateAction } from "react";
 import {
   getCurrentUser,
   loginRequest,
+  logoutRequest,
   registerRequest,
-  type CurrentUser,
-  type LoginPayload,
-  type RegisterPayload,
 } from "@/lib/auth-api";
+import type { CurrentUser, LoginPayload, RegisterPayload } from "@/lib/auth-api";
 import { ApiError } from "@/lib/api";
-import { clearStoredToken, getStoredToken, setStoredToken } from "@/lib/token-storage";
+import { clearLegacyAuthToken } from "@/lib/legacy-auth-storage";
 
 interface AuthContextValue {
   user: CurrentUser | null;
@@ -17,7 +16,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   login: (payload: LoginPayload) => Promise<CurrentUser>;
   register: (payload: RegisterPayload) => Promise<CurrentUser>;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshUser: () => Promise<CurrentUser | null>;
   setUser: Dispatch<SetStateAction<CurrentUser | null>>;
 }
@@ -29,12 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = async () => {
-    const token = getStoredToken();
-
-    if (!token) {
-      setUser(null);
-      return null;
-    }
+    clearLegacyAuthToken();
 
     try {
       const currentUser = await getCurrentUser();
@@ -42,7 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return currentUser;
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
-        clearStoredToken();
         setUser(null);
         return null;
       }
@@ -63,6 +56,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         setUser(currentUser);
+      } catch {
+        if (active) setUser(null);
       } finally {
         if (active) {
           setIsLoading(false);
@@ -70,16 +65,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    const expireSession = () => setUser(null);
+    window.addEventListener("financebot:session-expired", expireSession);
     void bootstrapAuth();
 
     return () => {
       active = false;
+      window.removeEventListener("financebot:session-expired", expireSession);
     };
   }, []);
 
   const login = async (payload: LoginPayload) => {
-    const response = await loginRequest(payload);
-    setStoredToken(response.token);
+    await loginRequest(payload);
 
     const currentUser = await getCurrentUser();
     setUser(currentUser);
@@ -87,16 +84,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const register = async (payload: RegisterPayload) => {
-    const response = await registerRequest(payload);
-    setStoredToken(response.token);
+    await registerRequest(payload);
 
     const currentUser = await getCurrentUser();
     setUser(currentUser);
     return currentUser;
   };
 
-  const logout = () => {
-    clearStoredToken();
+  const logout = async () => {
+    await logoutRequest();
     setUser(null);
   };
 
