@@ -14,7 +14,8 @@
     "format": "prettier --write . && eslint --fix",
     "check": "prettier --check .",
     "test:e2e": "playwright test",
-    "test:e2e:session": "playwright test --config playwright.session.config.ts"
+    "test:e2e:session": "playwright test --config playwright.session.config.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -77,7 +78,6 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
-    "@tailwindcss/typography": "^0.5.16",
     "@tanstack/devtools-vite": "latest",
     "@tanstack/eslint-config": "latest",
     "@testing-library/dom": "^10.4.1",
@@ -90,8 +90,8 @@
     "jsdom": "^28.1.0",
     "prettier": "^3.8.1",
     "typescript": "^6.0.2",
-    "vite": "^8.0.0",
-    "vitest": "^4.1.5"
+    "vite": "^8.3.5",
+    "vitest": "^4.1.12"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

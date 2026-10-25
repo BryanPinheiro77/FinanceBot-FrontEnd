@@ -15,11 +15,13 @@
 - Dashboard inicial com dados reais básicos
 
 ### Security
+- Dependências vulneráveis atualizadas e plugin de tipografia não utilizado removido; auditoria passa a integrar o CI
 - Sessão em cookie HttpOnly, host-only e Secure em produção, sem JWT no JSON ou Web Storage; proteção CSRF e allowlist no servidor web
 - Origem da cota de login/cadastro assinada entre os runtimes com chave exclusiva; exige publicação coordenada com a API
 - Atualização do TanStack Start para 1.168.60 e do core de servidor para 1.169.39, corrigindo a CVE-2026-102989 que bloqueava os builds na Vercel
 
 ### Changed
+- Tipos de calendário, gráficos, paginação e tratamento de erros alinhados às bibliotecas instaladas, com typecheck no CI
 - Apresentação da landing, sombras dos cards e transição entre temas claro e escuro
 - Textos de segurança alinhados às proteções atualmente implementadas
 - Idioma do documento para português brasileiro
