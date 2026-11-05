@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apiRequest } from './api'
 import { decodeTransactionJson } from './transaction-model'
+
 const state = vi.hoisted(() => ({ renew: vi.fn() }))
 vi.mock('./session-renewal', () => ({ renewSession: state.renew }))
 afterEach(() => {
