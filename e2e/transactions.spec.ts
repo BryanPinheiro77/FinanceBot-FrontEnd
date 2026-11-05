@@ -54,46 +54,49 @@ test('lista, paginação, filtros e URL funcionam em celular e desktop', async (
     animations: 'disabled',
   })
   await page.getByRole('button', { name: 'Ativar tema escuro' }).click()
-  const contrast = await page.evaluate(() => {
-    const canvas = document.createElement('canvas')
-    canvas.width = canvas.height = 1
-    const context = canvas.getContext('2d')!
-    const luminance = (color: string) => {
-      context.clearRect(0, 0, 1, 1)
-      context.fillStyle = color
-      context.fillRect(0, 0, 1, 1)
-      const rgb = Array.from(context.getImageData(0, 0, 1, 1).data)
-        .slice(0, 3)
-        .map((value) => {
-          const srgb = value / 255
-          return srgb <= 0.04045
-            ? srgb / 12.92
-            : ((srgb + 0.055) / 1.055) ** 2.4
-        })
-      return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722
-    }
-    return [
-      ['.transaction-origin', '.transaction-records'],
-      ['.finance-nav a[aria-current]', '.dashboard-header'],
-      [
-        '.transactions-heading-actions button:last-child',
-        '.transactions-heading-actions button:last-child',
-      ],
-    ].map(([foreground, background]) => {
-      const a = luminance(
-        getComputedStyle(document.querySelector(foreground)!).color,
-      )
-      const b = luminance(
-        getComputedStyle(document.querySelector(background)!).backgroundColor,
-      )
-      return {
-        selector: foreground,
-        ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
+  const contrast = () =>
+    page.evaluate(() => {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 1
+      const context = canvas.getContext('2d')!
+      const luminance = (color: string) => {
+        context.clearRect(0, 0, 1, 1)
+        context.fillStyle = color
+        context.fillRect(0, 0, 1, 1)
+        const rgb = Array.from(context.getImageData(0, 0, 1, 1).data)
+          .slice(0, 3)
+          .map((value) => {
+            const srgb = value / 255
+            return srgb <= 0.04045
+              ? srgb / 12.92
+              : ((srgb + 0.055) / 1.055) ** 2.4
+          })
+        return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722
       }
+      return [
+        ['.transaction-origin', '.transaction-records'],
+        ['.finance-nav a[aria-current]', '.dashboard-header'],
+        [
+          '.transactions-heading-actions button:last-child',
+          '.transactions-heading-actions button:last-child',
+        ],
+      ].map(([foreground, background]) => {
+        const a = luminance(
+          getComputedStyle(document.querySelector(foreground)!).color,
+        )
+        const b = luminance(
+          getComputedStyle(document.querySelector(background)!).backgroundColor,
+        )
+        return {
+          selector: foreground,
+          ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
+        }
+      })
     })
-  })
-  for (const result of contrast)
-    expect(result.ratio, result.selector).toBeGreaterThanOrEqual(4.5)
+  // A troca de tema anima as cores; medir o estado final, sem afrouxar o contraste.
+  await expect
+    .poll(async () => (await contrast()).filter((result) => result.ratio < 4.5))
+    .toEqual([])
   await page.screenshot({
     path: info.outputPath('transactions-dark.png'),
     fullPage: true,

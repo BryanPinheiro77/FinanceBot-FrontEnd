@@ -122,6 +122,8 @@ ou teste de concorrência contra produção.
 A primeira execução no worktree final teve dois timeouts durante o carregamento
 inicial de módulos do Vite. A espera inicial do teste passou de 5 para 20 segundos;
 a suíte foi reexecutada integralmente, sem alterar as verificações do CRUD.
+No CI, a leitura de contraste precisou aguardar a transição de cores ao trocar
+para o tema escuro; usa polling da condição original de pelo menos 4,5:1.
 
 A implementação usa worktree próprio. A main com sessões revogáveis foi integrada
 antes da publicação: cliente HTTP mantém o decoder decimal após renovação, proxy
