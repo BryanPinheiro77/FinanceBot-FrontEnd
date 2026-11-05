@@ -64,7 +64,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}) {
   });
 
   let response = await send();
-  if (response.status === 401 && !path.startsWith('/auth/login') && !path.startsWith('/auth/register') && !path.startsWith('/auth/logout')) {
+  if (response.status === 401 && response.headers.get('X-FinanceBot-Session-Renewable') === '1' && !path.startsWith('/auth/login') && !path.startsWith('/auth/register') && !path.startsWith('/auth/logout')) {
     if (await renewSession()) response = await send();
   }
 

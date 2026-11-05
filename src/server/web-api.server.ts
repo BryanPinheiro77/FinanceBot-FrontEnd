@@ -215,6 +215,8 @@ export async function handleWebApi(
     const responseHeaders = headers()
     if (refreshing) clearCookies(responseHeaders, options.production)
     else responseHeaders.append('Set-Cookie', cookie('', 0, options.production))
+    if (!refreshing && refresh)
+      responseHeaders.set('X-FinanceBot-Session-Renewable', '1')
     return problem(401, 'Entre novamente para continuar.', responseHeaders)
   }
   let body: string | undefined
@@ -264,8 +266,10 @@ export async function handleWebApi(
     if (response.status === 401) {
       if (authentication || refreshing || logout)
         clearCookies(responseHeaders, options.production)
-      else
+      else {
         responseHeaders.append('Set-Cookie', cookie('', 0, options.production))
+        if (refresh) responseHeaders.set('X-FinanceBot-Session-Renewable', '1')
+      }
     }
     if (logout && response.ok) {
       clearCookies(responseHeaders, options.production)
