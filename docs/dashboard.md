@@ -67,7 +67,7 @@ reduced-motion. Cada projeto grava capturas dos temas claro e escuro em
 das suítes já existentes.
 
 São dados de fixture, não evidência de integração com uma instalação real. Testes
-H2/JWT do contrato e isolamento pertencem ao backend. Não foi realizado deploy.
+H2/JWT do contrato e isolamento pertencem ao backend. Os testes locais não executam deploy; a publicação coordenada está registrada abaixo.
 
 ## Capturas locais
 
@@ -94,3 +94,21 @@ O detector Impeccable reportou somente a tipografia Plus Jakarta Sans já adotad
 pela aplicação. Ela foi preservada para manter a identidade da landing page.
 Os testes de navegador usam Chromium local; não foi feito teste manual em Safari
 ou Firefox nem auditoria completa WCAG por ferramenta especializada.
+
+## Publicação coordenada — 05/11/2026
+
+O [PR #12](https://github.com/BryanPinheiro77/FinanceBot-FrontEnd/pull/12) foi
+mesclado depois do deploy saudável da API na
+[promoção #233](https://github.com/BryanPinheiro77/FinanceBot-BackEnd/pull/233).
+A Vercel confirmou o target de produção como `READY` no SHA
+`853f82cb4a16d70ef18f6167a03fcad8195110eb`, com o alias
+[FinanceBot Web](https://financebot-xi.vercel.app).
+
+[CI do PR](https://github.com/BryanPinheiro77/FinanceBot-FrontEnd/actions/runs/42069815309)
+e [CI da main](https://github.com/BryanPinheiro77/FinanceBot-FrontEnd/actions/runs/42072061020)
+registram os checks da entrega. Não foram criadas contas ou transações de produção
+para smoke autenticado; validação funcional usa as fixtures já descritas.
+
+Auditoria npm pré-publicação: nove avisos moderados na cadeia de lint, nenhum alto
+ou crítico. A publicação não altera dependências. API e bot não receberam migrations
+ou secrets novos. Ajustes posteriores deste registro são somente documentação.

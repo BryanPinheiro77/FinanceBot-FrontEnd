@@ -1,4 +1,4 @@
-# Em desenvolvimento — issue #164
+# v1.12.0 — 05/11/2026 — issue #164
 
 - Dashboard mensal integrado à API: receitas, despesas, resultado, série diária e
   despesas por categoria, com seletor de período e valores em reais.
