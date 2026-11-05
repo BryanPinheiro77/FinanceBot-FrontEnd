@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import {
   getCurrentUser,
@@ -27,6 +27,8 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [user, setUser] = useState<CurrentUser | null>(null);
+  const currentUserRef = useRef<CurrentUser | null>(null);
+  currentUserRef.current = user;
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = async () => {
@@ -68,8 +70,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const expireSession = () => {
+      const hadSession = currentUserRef.current !== null;
       setUser(null);
-      void navigate({ to: '/login' });
+      // O bootstrap anônimo também recebe 401; visitantes da landing ficam nela.
+      if (hadSession) void navigate({ to: '/login' });
     };
     window.addEventListener("financebot:session-expired", expireSession);
     void bootstrapAuth();
