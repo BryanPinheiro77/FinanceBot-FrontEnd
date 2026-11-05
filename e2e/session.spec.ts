@@ -123,3 +123,106 @@ test('sessões de dois navegadores não compartilham identidade', async ({
     await second.dispose()
   }
 })
+
+async function signIn(page: import('@playwright/test').Page) {
+  await page.goto('/login')
+  await page.getByPlaceholder('joao@email.com').fill('session@example.invalid')
+  await page.getByPlaceholder('Sua senha').fill('fixture-password')
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+}
+
+test('renova sessão no reload quando access expirou, sem expor refresh a JavaScript', async ({
+  page,
+  context,
+}) => {
+  await signIn(page)
+  const before = (await context.cookies()).find(
+    (cookie) => cookie.name === 'financebot.refresh',
+  )!
+  expect(before.httpOnly).toBe(true)
+  await context.clearCookies({ name: 'financebot.session' })
+  await page.reload()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(
+    page.getByRole('button', { name: 'Sair', exact: true }),
+  ).toBeVisible()
+  const after = (await context.cookies()).find(
+    (cookie) => cookie.name === 'financebot.refresh',
+  )!
+  expect(after.value).not.toBe(before.value)
+  expect(await page.evaluate(() => document.cookie)).not.toContain(
+    'financebot.refresh',
+  )
+})
+
+test('aviso após uma hora mostra contagem e revoga sessão ao chegar a zero', async ({
+  page,
+  context,
+}) => {
+  await page.clock.install()
+  const metadata = page.waitForResponse(
+    (response) => response.url().endsWith('/auth/session') && response.ok(),
+  )
+  await signIn(page)
+  await metadata
+  await page.clock.fastForward(3600_000)
+  await expect(page.getByRole('alertdialog')).toBeVisible()
+  await expect(
+    page.getByRole('heading', { name: 'Você será desconectado' }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Continuar conectado' }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Continuar conectado' }),
+  ).toBeFocused()
+  await page.screenshot({
+    path: test.info().outputPath('session-warning-desktop.png'),
+    animations: 'disabled',
+  })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.screenshot({
+    path: test.info().outputPath('session-warning-mobile.png'),
+    animations: 'disabled',
+  })
+  await page.clock.fastForward(61_000)
+  await expect(page).toHaveURL(/\/login$/)
+  expect(
+    (await context.cookies()).some(
+      (cookie) => cookie.name === 'financebot.refresh',
+    ),
+  ).toBe(false)
+})
+
+test('logout de uma aba encerra também a outra', async ({ page, context }) => {
+  await signIn(page)
+  const other = await context.newPage()
+  await other.goto('/dashboard')
+  await expect(
+    other.getByRole('button', { name: 'Sair', exact: true }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Sair', exact: true }).click()
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(other).toHaveURL(/\/login$/)
+})
+
+test('duas abas renovam juntas sem reutilizar o refresh consumido', async ({
+  page,
+  context,
+}) => {
+  await signIn(page)
+  const other = await context.newPage()
+  await other.goto('/dashboard')
+  await expect(
+    other.getByRole('button', { name: 'Sair', exact: true }),
+  ).toBeVisible()
+  await context.clearCookies({ name: 'financebot.session' })
+  await Promise.all([page.reload(), other.reload()])
+  for (const tab of [page, other]) {
+    await expect(tab).toHaveURL(/\/dashboard$/)
+    await expect(
+      tab.getByRole('button', { name: 'Sair', exact: true }),
+    ).toBeVisible()
+  }
+})

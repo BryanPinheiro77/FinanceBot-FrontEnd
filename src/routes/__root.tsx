@@ -1,6 +1,7 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { AuthProvider } from "@/context/auth-context";
+import { SessionTimeout } from "@/components/SessionTimeout";
 import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "../styles.css?url";
@@ -75,6 +76,7 @@ function RootComponent() {
       <AuthProvider>
         <Outlet />
         <Toaster />
+        <SessionTimeout />
       </AuthProvider>
     </ThemeProvider>
   );
