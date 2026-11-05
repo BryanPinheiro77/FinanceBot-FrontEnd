@@ -28,6 +28,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e:session
       - run: npm run test:e2e:dashboard
+      - run: npm run test:e2e:transactions
       - run: npm run test:e2e
       - name: Whitespace
         run: git diff --check HEAD^ HEAD

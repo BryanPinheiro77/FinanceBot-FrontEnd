@@ -41,7 +41,10 @@ o código não confia em headers públicos arbitrários como substituto.
 ## Fronteira do proxy
 
 Somente os endpoints já consumidos pelo web estão na allowlist: login/cadastro,
-logout local, perfil, renda/onboarding, código de vínculo, contas e categorias.
+logout local, perfil, renda/onboarding, código de vínculo, contas, categorias,
+resumo mensal e CRUD unitário de transações. Transações permitem GET/POST na
+coleção e GET/PUT/DELETE em IDs positivos canônicos; endpoints de parcelamento
+continuam bloqueados. [Contratos e limites](transactions.md).
 Adicionar endpoints exige revisar método/path, validação e testes; não abrir
 `/telegram`, `/actuator`, Swagger ou uma URL arbitrária. APIs não consumidas pelo
 web continuam acessíveis diretamente pelos clientes Bearer autorizados.

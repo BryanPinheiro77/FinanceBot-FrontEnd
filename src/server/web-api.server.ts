@@ -21,6 +21,8 @@ const ALLOWED = new Set([
   'GET /users/me',
   'GET /accounts',
   'GET /categories',
+  'GET /transactions',
+  'POST /transactions',
   'GET /dashboard/monthly-summary',
   'PATCH /users/me/monthly-base-income',
   'PATCH /users/me/onboarding-completed',
@@ -157,7 +159,12 @@ export async function handleWebApi(
   path: string,
   options: WebApiOptions,
 ): Promise<Response> {
-  if (!ALLOWED.has(`${request.method} ${path}`))
+  const resourceId = /^\/transactions\/([1-9]\d{0,18})$/.exec(path)?.[1]
+  const transactionResource =
+    resourceId !== undefined &&
+    BigInt(resourceId) <= 9223372036854775807n &&
+    ['GET', 'PUT', 'DELETE'].includes(request.method)
+  if (!ALLOWED.has(`${request.method} ${path}`) && !transactionResource)
     return problem(404, 'Recurso não disponível.')
   let configured: ReturnType<typeof validateOptions>
   try {

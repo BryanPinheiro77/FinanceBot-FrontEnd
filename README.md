@@ -36,6 +36,7 @@ npm test
 npm run build
 npm run test:e2e:session
 npm run test:e2e:dashboard
+npm run test:e2e:transactions
 ```
 
 O smoke de sessão inicia API fictícia em loopback e cobre login/cadastro,
@@ -47,6 +48,10 @@ problemas de componentes legados devem ser tratados sem ocultar novas regressõe
 O [dashboard mensal](docs/dashboard.md) consome totais e gráficos calculados pela
 API. A suíte dedicada cobre períodos, erros, sessão e isolamento em desktop e
 celular, usando apenas fixtures locais.
+
+A [tela de transações](docs/transactions.md) usa o CRUD existente da API, com filtros,
+paginação, preservação de centavos e confirmação de exclusão. A suíte dedicada usa
+fixtures isoladas; não realiza operações sobre dados de produção.
 
 ## Publicação
 
