@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import {
@@ -24,6 +25,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -65,7 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const expireSession = () => setUser(null);
+    const expireSession = () => {
+      setUser(null);
+      void navigate({ to: '/login' });
+    };
     window.addEventListener("financebot:session-expired", expireSession);
     void bootstrapAuth();
 
@@ -94,6 +99,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await logoutRequest();
     setUser(null);
+    const bus = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('financebot:session');
+    bus?.postMessage({ type: 'logout' });
+    bus?.close();
   };
 
   const value = useMemo<AuthContextValue>(() => ({

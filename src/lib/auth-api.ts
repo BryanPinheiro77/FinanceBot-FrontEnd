@@ -119,3 +119,18 @@ export async function createCategory(name: string, type: CategoryType) {
 export async function logoutRequest() {
   return apiRequest<void>("/auth/logout", { method: "POST" });
 }
+
+export interface SessionActivity {
+  lastActivityAt: string;
+  idleWarningAt: string;
+  idleExpiresAt: string;
+  sessionExpiresAt: string;
+}
+
+export function getSessionActivity() {
+  return apiRequest<SessionActivity>('/auth/session');
+}
+
+export function reportSessionActivity() {
+  return apiRequest<SessionActivity>('/auth/activity', { method: 'POST' });
+}

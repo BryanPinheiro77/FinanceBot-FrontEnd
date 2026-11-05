@@ -4,8 +4,11 @@ import { handleWebApi, sessionCookieName } from './web-api.server'
 import type { WebApiOptions } from './web-api.server'
 
 const now = 1_800_000_000_000
+const refreshToken = 'r'.repeat(43)
+const sessionExpiresAt = new Date(now + 8 * 3600_000).toISOString()
 const key = Buffer.alloc(32).toString('base64') // Exclusivo da fixture.
 const jwt = `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(JSON.stringify({ exp: now / 1000 + 86400 })).toString('base64url')}.Zml4dHVyZQ`
+const pair = { token: jwt, refreshToken, sessionExpiresAt }
 const base: WebApiOptions = {
   upstream: 'https://api.example.invalid',
   production: true,
@@ -29,7 +32,7 @@ function request(
     },
   })
 }
-function options(result = Response.json({ token: jwt, type: 'Bearer' })) {
+function options(result = Response.json({ ...pair, type: 'Bearer' })) {
   return { ...base, fetch: vi.fn<typeof fetch>().mockResolvedValue(result) }
 }
 
@@ -58,7 +61,7 @@ describe('sessão web no servidor', () => {
     const response = await handleWebApi(
       request('/auth/register'),
       '/auth/register',
-      options(Response.json({ token: jwt }, { status: 201 })),
+      options(Response.json(pair, { status: 201 })),
     )
     expect(response.status).toBe(201)
     expect(response.headers.get('Set-Cookie')).toContain('HttpOnly')
@@ -200,7 +203,7 @@ describe('sessão web no servidor', () => {
   it.each([
     '/telegram/users/me',
     '/actuator/env',
-    '/auth/refresh',
+    '/auth/unknown',
     '//attacker.invalid',
     '/../auth/login',
   ])('não oferece proxy para %s', async (path) => {
@@ -228,15 +231,14 @@ describe('sessão web no servidor', () => {
       expect(response.status).toBe(status)
       expect(response.headers.get('Retry-After')).toBe('5')
       expect(response.headers.get('Access-Control-Allow-Origin')).toBeNull()
-      expect(response.headers.get('Set-Cookie')).toBe(
-        status === 401
-          ? '__Host-financebot.session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure'
-          : null,
-      )
+      if (status === 401) {
+        expect(response.headers.getSetCookie()).toHaveLength(2)
+        expect(response.headers.get('Set-Cookie')).toContain('Max-Age=0')
+      } else expect(response.headers.get('Set-Cookie')).toBeNull()
     }
   })
 
-  it('logout exige CSRF, limpa cookie e não chama a API', async () => {
+  it('logout sem sessão exige CSRF e limpa ambos os cookies', async () => {
     const config = options()
     const response = await handleWebApi(
       request('/auth/logout'),
@@ -383,5 +385,119 @@ describe('sessão web no servidor', () => {
       `${sessionCookieName(false)}=`,
     )
     expect(response.headers.get('Set-Cookie')).not.toContain('Secure')
+  })
+  it('refresh vem somente do cookie HttpOnly e a resposta esconde ambas as credenciais', async () => {
+    const config = options()
+    const response = await handleWebApi(
+      request('/auth/refresh', 'POST', {
+        Cookie: `__Host-financebot.refresh=${refreshToken}`,
+        Authorization: 'Bearer attacker',
+      }),
+      '/auth/refresh',
+      config,
+    )
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ authenticated: true })
+    expect(config.fetch.mock.calls[0][1]!.body).toBe(
+      JSON.stringify({ refreshToken }),
+    )
+    expect(response.headers.getSetCookie()).toHaveLength(2)
+    expect(response.headers.getSetCookie()[1]).toContain('HttpOnly')
+    expect(response.headers.getSetCookie()[1]).toContain('Secure')
+  })
+
+  it('logout chama a API para revogar antes de remover os cookies', async () => {
+    const config = options(new Response(null, { status: 204 }))
+    const response = await handleWebApi(
+      request('/auth/logout', 'POST', {
+        Cookie: `__Host-financebot.refresh=${refreshToken}`,
+      }),
+      '/auth/logout',
+      config,
+    )
+    expect(response.status).toBe(204)
+    expect(String(config.fetch.mock.calls[0][0])).toBe(
+      'https://api.example.invalid/auth/logout',
+    )
+    expect(config.fetch.mock.calls[0][1]!.body).toBe(
+      JSON.stringify({ refreshToken }),
+    )
+    expect(response.headers.getSetCookie()).toHaveLength(2)
+    expect(
+      response.headers
+        .getSetCookie()
+        .every((value) => value.includes('Max-Age=0')),
+    ).toBe(true)
+  })
+
+  it('falha de revogação não informa logout concluído nem perde a credencial para tentar novamente', async () => {
+    const config = options(new Response(null, { status: 503 }))
+    const response = await handleWebApi(
+      request('/auth/logout', 'POST', {
+        Cookie: `__Host-financebot.refresh=${refreshToken}`,
+      }),
+      '/auth/logout',
+      config,
+    )
+    expect(response.status).toBe(503)
+    expect(response.headers.get('Set-Cookie')).toBeNull()
+  })
+
+  it('refresh exige CSRF, rejeita cookie duplicado e não confia em JSON do navegador', async () => {
+    const config = options()
+    expect(
+      (
+        await handleWebApi(
+          request('/auth/refresh', 'POST', {
+            Origin: 'https://attacker.invalid',
+            Cookie: `__Host-financebot.refresh=${refreshToken}`,
+          }),
+          '/auth/refresh',
+          config,
+        )
+      ).status,
+    ).toBe(403)
+    expect(
+      (
+        await handleWebApi(
+          request('/auth/refresh', 'POST', {
+            Cookie: `__Host-financebot.refresh=${refreshToken}; __Host-financebot.refresh=${refreshToken}`,
+          }),
+          '/auth/refresh',
+          config,
+        )
+      ).status,
+    ).toBe(401)
+    expect(config.fetch).not.toHaveBeenCalled()
+  })
+
+  it('renovação de outra aba com access recém emitido não consome o refresh novamente', async () => {
+    const config = options()
+    const response = await handleWebApi(
+      request('/auth/refresh', 'POST', {
+        Cookie: `__Host-financebot.session=${jwt}; __Host-financebot.refresh=${refreshToken}`,
+      }),
+      '/auth/refresh',
+      config,
+    )
+    expect(response.status).toBe(200)
+    expect(config.fetch).not.toHaveBeenCalled()
+    expect(response.headers.get('Set-Cookie')).toBeNull()
+  })
+
+  it('401 de access preserva refresh para a renovação posterior', async () => {
+    const config = options(new Response(null, { status: 401 }))
+    const response = await handleWebApi(
+      request('/users/me', 'GET', {
+        Cookie: `__Host-financebot.session=${jwt}; __Host-financebot.refresh=${refreshToken}`,
+      }),
+      '/users/me',
+      config,
+    )
+    expect(response.status).toBe(401)
+    expect(response.headers.getSetCookie()).toHaveLength(1)
+    expect(response.headers.get('Set-Cookie')).not.toContain(
+      'financebot.refresh',
+    )
   })
 })

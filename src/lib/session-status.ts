@@ -3,7 +3,7 @@ import { createServerFn } from '@tanstack/react-start'
 export const getSessionStatus = createServerFn({ method: 'GET' }).handler(
   async () => {
     const { getRequest } = await import('@tanstack/react-start/server')
-    const { handleWebApi, runtimeOptions } =
+    const { handleWebApi, runtimeOptions, hasRefreshCookie } =
       await import('@/server/web-api.server')
     const response = await handleWebApi(
       getRequest(),
@@ -11,12 +11,17 @@ export const getSessionStatus = createServerFn({ method: 'GET' }).handler(
       runtimeOptions(),
     )
     if (response.status === 401)
-      return { authenticated: false, onboardingCompleted: false }
+      return {
+        authenticated: false,
+        onboardingCompleted: false,
+        renewable: hasRefreshCookie(getRequest(), runtimeOptions().production),
+      }
     if (!response.ok)
       throw new Error('Não foi possível verificar sua sessão. Tente novamente.')
     const user = (await response.json()) as { onboardingCompleted: boolean }
     return {
       authenticated: true,
+      renewable: false,
       onboardingCompleted: user.onboardingCompleted,
     }
   },
