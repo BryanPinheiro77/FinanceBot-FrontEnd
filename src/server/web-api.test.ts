@@ -322,6 +322,60 @@ describe('sessão web no servidor', () => {
     expect(await response.text()).not.toContain('private-secret-and-address')
   })
 
+  it('encaminha apenas a consulta mensal autenticada, preservando período e impedindo cache', async () => {
+    const config = options(
+      Response.json({ month: '2026-11', totalIncome: 12.34 }),
+    )
+    const req = new Request(
+      'https://web.example.invalid/api/financebot/dashboard/monthly-summary?month=2026-11',
+      {
+        headers: { Cookie: `__Host-financebot.session=${jwt}` },
+      },
+    )
+    const response = await handleWebApi(
+      req,
+      '/dashboard/monthly-summary',
+      config,
+    )
+    expect(response.status).toBe(200)
+    expect(String(config.fetch.mock.calls[0][0])).toBe(
+      'https://api.example.invalid/dashboard/monthly-summary?month=2026-11',
+    )
+    expect(
+      new Headers(config.fetch.mock.calls[0][1]!.headers).get('Authorization'),
+    ).toBe(`Bearer ${jwt}`)
+    expect(config.fetch.mock.calls[0][1]!.cache).toBe('no-store')
+    expect(response.headers.get('Cache-Control')).toContain('no-store')
+    expect(response.headers.get('CDN-Cache-Control')).toBe('no-store')
+    expect(response.headers.get('Vary')).toBe('Cookie')
+    expect(await response.json()).toEqual({
+      month: '2026-11',
+      totalIncome: 12.34,
+    })
+    for (const method of ['POST', 'DELETE']) {
+      expect(
+        (
+          await handleWebApi(
+            request('/dashboard/monthly-summary', method),
+            '/dashboard/monthly-summary',
+            config,
+          )
+        ).status,
+      ).toBe(404)
+    }
+    config.fetch.mockClear()
+    expect(
+      (
+        await handleWebApi(
+          request('/dashboard/monthly-summary', 'GET'),
+          '/dashboard/monthly-summary',
+          config,
+        )
+      ).status,
+    ).toBe(401)
+    expect(config.fetch).not.toHaveBeenCalled()
+  })
+
   it('permite cookie sem Secure apenas no desenvolvimento local', async () => {
     const config = { ...options(), production: false, trustVercelIp: false }
     const response = await handleWebApi(request(), '/auth/login', config)

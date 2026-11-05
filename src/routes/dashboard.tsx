@@ -1,263 +1,336 @@
-import { toast } from "sonner";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Bot, DollarSign, Building2, CheckCircle, Send, LogOut, Sun, Moon, ExternalLink } from "lucide-react";
-import { useTheme } from "@/hooks/use-theme";
-import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
-import { useAuth } from "@/context/auth-context";
-import { requireAuth } from "@/lib/auth-guards";
-import { getAccounts, type AccountResponse } from "@/lib/auth-api";
-import { ApiError } from "@/lib/api";
-import { hasCompletedOnboarding } from "@/lib/onboarding";
+import { useEffect, useState } from 'react'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import {
+  Bot,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
+  LogOut,
+  Moon,
+  Sun,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import { useTheme } from '@/hooks/use-theme'
+import { Button } from '@/components/ui/button'
+import { MonthlyCharts } from '@/components/dashboard/MonthlyCharts'
+import { useAuth } from '@/context/auth-context'
+import { requireAuth } from '@/lib/auth-guards'
+import { getAccounts } from '@/lib/auth-api'
+import type { AccountResponse } from '@/lib/auth-api'
+import {
+  currentMonth,
+  formatCurrency,
+  getMonthlySummary,
+  monthLabel,
+  shiftMonth,
+} from '@/lib/dashboard-api'
+import type { MonthlySummary } from '@/lib/dashboard-api'
+import { ApiError } from '@/lib/api'
+import '../components/dashboard/dashboard.css'
 
-const TELEGRAM_BOT_URL = "http://t.me/YourFinanceAssistence_Bot";
-
-export const Route = createFileRoute("/dashboard")({
+export const Route = createFileRoute('/dashboard')({
   beforeLoad: requireAuth,
   head: () => ({
     meta: [
-      { title: "Painel — Finance Bot" },
-      { name: "description", content: "Seu painel financeiro no Finance Bot." },
+      { title: 'Painel — Finance Bot' },
+      {
+        name: 'description',
+        content: 'Resumo mensal das suas receitas e despesas no Finance Bot.',
+      },
     ],
   }),
   component: DashboardPage,
-});
+})
+
+type DashboardState = {
+  key: string
+  summary: MonthlySummary | null
+  accounts: AccountResponse[]
+  error: string | null
+}
 
 function DashboardPage() {
-  const { theme, toggleTheme } = useTheme();
-  const navigate = useNavigate();
-  const { user, isLoading, logout } = useAuth();
-  const [accounts, setAccounts] = useState<AccountResponse[]>([]);
-  const [isFetching, setIsFetching] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { theme, toggleTheme } = useTheme()
+  const navigate = useNavigate()
+  const { user, isLoading, logout } = useAuth()
+  const [month, setMonth] = useState(currentMonth)
+  const [attempt, setAttempt] = useState(0)
+  const [state, setState] = useState<DashboardState | null>(null)
+  const [loggingOut, setLoggingOut] = useState(false)
+  const userId = user?.id
+  const onboarded = user?.onboardingCompleted
+  const key = `${userId}:${month}:${attempt}`
 
   useEffect(() => {
-    if (isLoading) {
-      return;
-    }
-
-    if (!user) {
-      void navigate({ to: "/login" });
-    }
-  }, [isLoading, navigate, user]);
+    if (isLoading) return
+    if (!userId) void navigate({ to: '/login' })
+    else if (!onboarded) void navigate({ to: '/onboarding' })
+  }, [isLoading, navigate, onboarded, userId])
 
   useEffect(() => {
-    if (!user) {
-      return;
-    }
-
-    let active = true;
-
-    const loadAccounts = async () => {
-      setIsFetching(true);
-      setError(null);
-
-      try {
-        const accountList = await getAccounts();
-
-        if (!active) {
-          return;
+    if (!userId || !onboarded) return
+    const controller = new AbortController()
+    let active = true
+    // Consultas independentes; a chave impede exibir dados de outro mês ou usuário.
+    void Promise.all([
+      getMonthlySummary(month, controller.signal),
+      getAccounts(),
+    ])
+      .then(([summary, accounts]) => {
+        if (active) setState({ key, summary, accounts, error: null })
+      })
+      .catch((error: unknown) => {
+        if (active && !(error instanceof ApiError && error.status === 401)) {
+          setState({
+            key,
+            summary: null,
+            accounts: [],
+            error:
+              'Não foi possível carregar os dados deste mês. Tente novamente.',
+          })
         }
-
-        if (!hasCompletedOnboarding(user, accountList)) {
-          await navigate({ to: "/onboarding" });
-          return;
-        }
-
-        setAccounts(accountList);
-      } catch (loadError) {
-        if (active) {
-          setError(loadError instanceof ApiError ? loadError.message : "Não foi possível carregar o painel.");
-        }
-      } finally {
-        if (active) {
-          setIsFetching(false);
-        }
-      }
-    };
-
-    void loadAccounts();
-
+      })
     return () => {
-      active = false;
-    };
-  }, [navigate, user]);
+      active = false
+      controller.abort()
+    }
+  }, [key, month, onboarded, userId])
 
-  const primaryAccount = useMemo(() => accounts[0] ?? null, [accounts]);
+  const visible = state?.key === key ? state : null
+  const summary = visible?.summary
+  const loading = !visible
 
-  if (isLoading || isFetching) {
+  if (!user || isLoading || !onboarded) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
-        <div className="text-center">
-          <p className="text-lg font-semibold text-foreground">Carregando seu painel...</p>
-          <p className="text-sm text-muted-foreground mt-2">Aguarde um instante.</p>
-        </div>
-      </div>
-    );
+      <main className="dashboard-shell">
+        <p role="status">Carregando seu painel…</p>
+      </main>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="flex items-center justify-between px-6 sm:px-12 py-4 max-w-6xl mx-auto">
-          <div className="flex items-center gap-2 text-primary font-bold text-lg" style={{ fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif' }}>
-            <Bot className="w-6 h-6" />
+    <div className="dashboard">
+      <a className="dashboard-skip" href="#dashboard-main">
+        Pular para o conteúdo
+      </a>
+      <header className="dashboard-header">
+        <div className="dashboard-shell dashboard-header-inner">
+          <a href="/" className="dashboard-brand">
+            <Bot aria-hidden="true" />
             Finance Bot
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={toggleTheme} className="text-muted-foreground">
-              {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </a>
+          <div className="dashboard-header-actions">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              aria-label={
+                theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'
+              }
+            >
+              {theme === 'dark' ? (
+                <Sun aria-hidden="true" />
+              ) : (
+                <Moon aria-hidden="true" />
+              )}
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              className="gap-2 text-muted-foreground"
+              disabled={loggingOut}
               onClick={async () => {
+                setLoggingOut(true)
                 try {
-                  await logout();
-                  await navigate({ to: "/login" });
+                  await logout()
+                  await navigate({ to: '/login' })
                 } catch {
-                  toast.error("Não foi possível sair agora. Tente novamente.");
+                  toast.error('Não foi possível sair agora. Tente novamente.')
+                  setLoggingOut(false)
                 }
               }}
             >
-              <LogOut className="w-4 h-4" /> Sair
+              <LogOut aria-hidden="true" />
+              {loggingOut ? 'Saindo…' : 'Sair'}
             </Button>
           </div>
         </div>
       </header>
-
-      <main className="px-6 sm:px-12 py-10 max-w-6xl mx-auto">
-        {/* Success banner */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-accent border border-primary/20 rounded-2xl p-6 mb-8 flex items-center gap-4"
-        >
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            <CheckCircle className="w-6 h-6 text-primary" />
-          </div>
+      <main
+        id="dashboard-main"
+        tabIndex={-1}
+        className="dashboard-shell dashboard-main"
+      >
+        <div className="dashboard-heading">
           <div>
-            <h2 className="font-semibold text-foreground" style={{ fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif' }}>
-              Sua conta foi configurada com sucesso! 🎉
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Agora você pode começar a registrar suas finanças pelo Telegram.
-            </p>
+            <h1>Seu mês em perspectiva</h1>
+            <p>Olá, {user.name}. Acompanhe suas movimentações registradas.</p>
           </div>
-        </motion.div>
-
-        {error ? (
-          <div className="mb-8 rounded-2xl border border-destructive/20 bg-destructive/5 px-5 py-4 text-sm text-destructive">
-            {error}
+          <div
+            className="dashboard-period"
+            role="group"
+            aria-label="Selecionar período"
+          >
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Mês anterior"
+              disabled={month === '0001-01'}
+              onClick={() => setMonth((value) => shiftMonth(value, -1))}
+            >
+              <ChevronLeft aria-hidden="true" />
+            </Button>
+            <div>
+              <label htmlFor="dashboard-month">Mês de referência</label>
+              <input
+                id="dashboard-month"
+                type="month"
+                min="0001-01"
+                max="9999-12"
+                value={month}
+                onChange={(event) => {
+                  const value = event.target.value
+                  if (/^(?!0000)[0-9]{4}-(0[1-9]|1[0-2])$/.test(value))
+                    setMonth(value)
+                }}
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Próximo mês"
+              disabled={month === '9999-12'}
+              onClick={() => setMonth((value) => shiftMonth(value, 1))}
+            >
+              <ChevronRight aria-hidden="true" />
+            </Button>
           </div>
-        ) : null}
-
-        <h1 className="text-2xl font-bold text-foreground mb-6" style={{ fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif' }}>
-          Olá, {user?.name ?? "usuário"}
-        </h1>
-
-        <div className="grid sm:grid-cols-3 gap-5">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-card rounded-2xl border border-border p-6"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-primary" />
-              </div>
-              <span className="text-sm text-muted-foreground">Renda mensal</span>
-            </div>
-            <p className="text-2xl font-bold text-foreground">
-              {user?.monthlyBaseIncome != null
-                ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(user.monthlyBaseIncome)
-                : "Não informada"}
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-card rounded-2xl border border-border p-6"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-primary" />
-              </div>
-              <span className="text-sm text-muted-foreground">Conta principal</span>
-            </div>
-            <p className="text-2xl font-bold text-foreground">{primaryAccount?.name ?? "Não cadastrada"}</p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-card rounded-2xl border border-border p-6"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-telegram/10 flex items-center justify-center">
-                <Send className="w-5 h-5 text-telegram" />
-              </div>
-              <span className="text-sm text-muted-foreground">Telegram</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${user?.telegramLinked ? "bg-success" : "bg-muted-foreground"}`} />
-              <p className="text-lg font-semibold text-foreground">
-                {user?.telegramLinked ? "Conectado" : "Pendente"}
-              </p>
-            </div>
-          </motion.div>
         </div>
-
-        <div className="mt-10 bg-card rounded-2xl border border-border p-8 text-center">
-          <p className="text-muted-foreground mb-4">
-            Envie uma mensagem para o bot no Telegram para começar a registrar suas finanças.
-          </p>
-          <div className="bg-muted rounded-xl p-4 inline-block mb-4">
-            <code className="font-mono text-sm text-primary">
-              "Gastei 35 reais no almoço"
-            </code>
-          </div>
-          <div>
-            {user?.telegramLinkCode ? (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Use o código abaixo no Telegram para concluir o vínculo:
-                </p>
-                <div className="bg-muted rounded-xl p-4 inline-block">
-                  <code className="font-mono text-sm text-primary">/connect {user.telegramLinkCode}</code>
+        <p className="dashboard-period-label" aria-live="polite">
+          {monthLabel(month)}
+        </p>
+        <div aria-busy={loading}>
+          {loading ? (
+            <div className="dashboard-loading" role="status">
+              <p>Carregando dados de {monthLabel(month)}…</p>
+              <div className="dashboard-loading-lines" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </div>
+            </div>
+          ) : null}
+          {visible?.error ? (
+            <div className="dashboard-error" role="alert">
+              <h2>Não conseguimos atualizar o painel</h2>
+              <p>{visible.error}</p>
+              <Button
+                variant="outline"
+                onClick={() => setAttempt((value) => value + 1)}
+              >
+                Tentar novamente
+              </Button>
+            </div>
+          ) : null}
+          {summary ? (
+            <>
+              <dl className="dashboard-metrics">
+                <div>
+                  <dt>Receitas do mês</dt>
+                  <dd>{formatCurrency(summary.totalIncome)}</dd>
+                  <p>Entradas registradas</p>
                 </div>
                 <div>
+                  <dt>Despesas do mês</dt>
+                  <dd>{formatCurrency(summary.totalExpense)}</dd>
+                  <p>Saídas registradas</p>
+                </div>
+                <div>
+                  <dt>Resultado do mês</dt>
+                  <dd
+                    className={summary.balance < 0 ? 'dashboard-negative' : ''}
+                  >
+                    {formatCurrency(summary.balance)}
+                  </dd>
+                  <p>Receitas menos despesas</p>
+                </div>
+              </dl>
+              <p className="dashboard-data-note">
+                {summary.transactionCount}{' '}
+                {summary.transactionCount === 1
+                  ? 'lançamento no período'
+                  : 'lançamentos no período'}
+                . Inclui parcelas pela data de cada lançamento; não representa
+                saldo bancário nem projeção.
+              </p>
+              {summary.transactionCount === 0 ? (
+                <section
+                  className="dashboard-empty"
+                  aria-labelledby="empty-title"
+                >
+                  <h2 id="empty-title">Nenhum lançamento neste mês</h2>
+                  <p>
+                    Escolha outro período ou registre uma receita ou despesa
+                    pelo Telegram.
+                  </p>
                   <a
-                    href={TELEGRAM_BOT_URL}
+                    href="https://t.me/YourFinanceAssistence_Bot"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-sm text-telegram hover:underline"
                   >
-                    Abrir @YourFinanceAssistence_Bot no Telegram
-                    <ExternalLink className="w-3 h-3" />
+                    Abrir o bot no Telegram <ExternalLink aria-hidden="true" />
                   </a>
-                </div>
-              </div>
-            ) : (
+                </section>
+              ) : (
+                <MonthlyCharts summary={summary} />
+              )}
+            </>
+          ) : null}
+        </div>
+        <section
+          className="dashboard-connections"
+          aria-labelledby="connections-title"
+        >
+          <h2 id="connections-title">Sua configuração</h2>
+          <dl>
+            <div>
+              <dt>Renda mensal cadastrada</dt>
+              <dd>
+                {user.monthlyBaseIncome == null
+                  ? 'Não informada'
+                  : formatCurrency(user.monthlyBaseIncome)}
+              </dd>
+              <p>Referência do cadastro; não é receita registrada.</p>
+            </div>
+            <div>
+              <dt>Contas cadastradas</dt>
+              <dd>
+                {visible?.summary
+                  ? visible.accounts
+                      .map((account) => account.name)
+                      .join(', ') || 'Nenhuma conta cadastrada'
+                  : 'Disponíveis após carregar o painel'}
+              </dd>
+            </div>
+            <div>
+              <dt>Telegram</dt>
+              <dd>{user.telegramLinked ? 'Conectado' : 'Vínculo pendente'}</dd>
               <a
-                href={TELEGRAM_BOT_URL}
+                href="https://t.me/YourFinanceAssistence_Bot"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm text-telegram hover:underline"
               >
-                Abrir @YourFinanceAssistence_Bot no Telegram
-                <ExternalLink className="w-3 h-3" />
+                Abrir Telegram <ExternalLink aria-hidden="true" />
               </a>
-            )}
-          </div>
-        </div>
+              {!user.telegramLinked && user.telegramLinkCode ? (
+                <p>
+                  Para concluir o vínculo, envie{' '}
+                  <code>/connect {user.telegramLinkCode}</code> ao bot.
+                </p>
+              ) : null}
+            </div>
+          </dl>
+        </section>
       </main>
     </div>
-  );
+  )
 }

@@ -15,7 +15,8 @@
     "check": "prettier --check .",
     "test:e2e": "playwright test",
     "test:e2e:session": "playwright test --config playwright.session.config.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e:dashboard": "playwright test --config playwright.dashboard.config.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

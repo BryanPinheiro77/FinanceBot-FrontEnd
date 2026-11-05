@@ -35,6 +35,7 @@ de dados autenticados. [Configuração, limites e publicação](docs/web-session
 npm test
 npm run build
 npm run test:e2e:session
+npm run test:e2e:dashboard
 ```
 
 O smoke de sessão inicia API fictícia em loopback e cobre login/cadastro,
@@ -42,6 +43,10 @@ recarga autenticada, logout, descarte do token antigo e CSRF sem acessar produç
 Os testes de landing continuam em `npm run test:e2e` (configuração original).
 `npm run lint`, `npm run check` e `npx tsc --noEmit` são verificações adicionais;
 problemas de componentes legados devem ser tratados sem ocultar novas regressões.
+
+O [dashboard mensal](docs/dashboard.md) consome totais e gráficos calculados pela
+API. A suíte dedicada cobre períodos, erros, sessão e isolamento em desktop e
+celular, usando apenas fixtures locais.
 
 ## Publicação
 

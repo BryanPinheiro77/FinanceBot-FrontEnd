@@ -1,3 +1,13 @@
+# Em desenvolvimento — issue #164
+
+- Dashboard mensal integrado à API: receitas, despesas, resultado, série diária e
+  despesas por categoria, com seletor de período e valores em reais.
+- Estados de carregamento, vazio, erro/retry e expiração de sessão; proteção contra
+  respostas antigas e troca de usuário.
+- Tabela acessível por teclado, temas claro/escuro, layout responsivo e redução de
+  movimento. Suíte Playwright específica incluída no CI.
+- Requer publicar antes o contrato de resumo mensal na API.
+
 # Changelog
 
 ## [Unreleased]
