@@ -1,4 +1,4 @@
-# Em desenvolvimento — issue #167
+# v1.14.0 — 05/11/2026 — issue #167
 
 - Tela de transações com consulta, filtros, paginação e CRUD unitário integrado à
   API existente, com confirmação de exclusão e aviso para parcelas individuais.
@@ -7,7 +7,8 @@
 - Centavos preservados na leitura/serialização; criação usa Idempotency-Key com
   tratamento conservador de resposta perdida e expiração do reenvio.
 - Proxy limitado aos métodos/paths de transações, com sessão/CSRF/no-store preservados.
-- Testes, capturas com fixtures e contrato documentados; sem publicação nesta etapa.
+- Integrado às sessões revogáveis da v1.13.0, com reenvio após renovação preservando corpo, centavos e chave de idempotência.
+- Testes, capturas com fixtures e contrato documentados; sem novas dependências ou configuração.
 
 # v1.12.0 — 05/11/2026 — issue #164
 

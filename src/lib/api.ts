@@ -1,3 +1,4 @@
+import { renewSession } from '@/lib/session-renewal'
 import { clearLegacyAuthToken } from '@/lib/legacy-auth-storage'
 
 const API_BASE_URL = '/api/financebot'
@@ -69,12 +70,24 @@ export async function apiRequest<T>(
   headers.delete('Authorization')
   headers.set('X-FinanceBot-CSRF', '1')
 
-  const response = await fetch(buildUrl(path), {
-    ...init,
-    headers,
-    credentials: 'same-origin',
-    cache: 'no-store',
-  })
+  const send = () =>
+    fetch(buildUrl(path), {
+      ...init,
+      headers,
+      credentials: 'same-origin',
+      cache: 'no-store',
+    })
+
+  let response = await send()
+  if (
+    response.status === 401 &&
+    response.headers.get('X-FinanceBot-Session-Renewable') === '1' &&
+    !path.startsWith('/auth/login') &&
+    !path.startsWith('/auth/register') &&
+    !path.startsWith('/auth/logout')
+  ) {
+    if (await renewSession()) response = await send()
+  }
 
   if (!response.ok) {
     let payload: ApiErrorPayload | null = null

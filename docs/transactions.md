@@ -103,16 +103,18 @@ Capturas da lista: [desktop claro](evidence/issue-167/list-desktop-light.png),
 Os templates preservam a tipografia existente; o detector Impeccable reportou
 somente essa escolha de fonte já adotada pelo produto.
 
-Publicação, commit e push desta issue ainda não foram executados. Esta documentação
-registra a implementação local, sem alegar smoke autenticado em ambiente real,
-validação Safari/Firefox ou teste de concorrência contra produção.
+Publicação autorizada para a v1.14.0, pela integração Git da Vercel após CI e
+merge na main. As notas da release registram os SHAs, PRs e a confirmação do
+deploy. Não foi feito smoke autenticado com dados reais, validação Safari/Firefox
+ou teste de concorrência contra produção.
 
 ### Resultado executado
 
-- 57 testes unitários/proxy aprovados, incluindo dinheiro exato, calendário,
+- 73 testes unitários/proxy aprovados, incluindo dinheiro exato, calendário,
   normalização, allowlist, CSRF e encaminhamento do corpo/chave.
-- 33 cenários Playwright de transações aprovados (11 por projeto).
-- Regressões: 18 cenários de dashboard e 4 de sessão aprovados; landing com
+- 36 cenários Playwright de transações aprovados (12 por projeto), incluindo
+  criação com renovação de sessão sem duplicar.
+- Regressões: 18 cenários de dashboard e 8 de sessão aprovados; landing com
   41 aprovados e 4 skips preexistentes.
 - Typecheck, build, ESLint dos arquivos alterados e whitespace aprovados.
 - Não houve alteração de Java; a suíte Maven não foi reexecutada nesta issue.
@@ -121,6 +123,22 @@ A primeira execução no worktree final teve dois timeouts durante o carregament
 inicial de módulos do Vite. A espera inicial do teste passou de 5 para 20 segundos;
 a suíte foi reexecutada integralmente, sem alterar as verificações do CRUD.
 
-A implementação foi isolada na base publicada v1.12.0 para preservar alterações
-paralelas de sessões revogáveis. Antes de mesclar com essa frente, integrar e
-validar em conjunto o cliente HTTP, proxy, guards e cabeçalho de autenticação.
+A implementação usa worktree próprio. A main com sessões revogáveis foi integrada
+antes da publicação: cliente HTTP mantém o decoder decimal após renovação, proxy
+preserva cookies e endpoints de sessão, e os guards e o aviso de ociosidade
+permanecem ativos. As suítes acima foram reexecutadas nessa base conjunta.
+
+### Revisão pré-publicação
+
+- Segurança: autenticação, CSRF, allowlist, cookie protegido e no-store preservados;
+  sem credenciais ou conteúdo financeiro em logs/armazenamento web.
+- Banco e IA: sem mudanças nesta entrega; regras financeiras continuam na API.
+- Código e interface: testes de erros, paginação, identidade, valores e acessibilidade
+  descritos acima. Capturas usam somente fixtures.
+- Dependências: npm audit com zero high/critical e nove moderate já existentes;
+  package-lock e dependências permanecem iguais à main.
+- Deploy: mesmo projeto Vercel e variáveis existentes; reversão pode republicar o
+  SHA anterior compatível. Não há migrations novas ou rollback automático.
+- Observabilidade: tratamento de falhas e logs da plataforma mantidos; sem novo
+  monitoramento de erros no browser. Backup contínuo permanece na #220 do backend,
+  sem alteração de banco ou infraestrutura pela #167.

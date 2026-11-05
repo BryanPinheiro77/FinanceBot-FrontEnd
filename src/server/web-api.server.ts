@@ -13,11 +13,15 @@ export interface WebApiOptions {
 
 const MAX_BODY = 64 * 1024
 const MAX_SESSION_SECONDS = 8 * 60 * 60
+const REFRESH_PATTERN = /^[A-Za-z0-9_-]{43}$/
 const JWT_PATTERN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
 const ALLOWED = new Set([
   'POST /auth/login',
   'POST /auth/register',
   'POST /auth/logout',
+  'POST /auth/refresh',
+  'POST /auth/activity',
+  'GET /auth/session',
   'GET /users/me',
   'GET /accounts',
   'GET /categories',
@@ -48,19 +52,40 @@ export function sessionCookieName(production: boolean) {
   return production ? '__Host-financebot.session' : 'financebot.session'
 }
 
-function cookie(value: string, maxAge: number, production: boolean) {
-  return `${sessionCookieName(production)}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${production ? '; Secure' : ''}`
+export function refreshCookieName(production: boolean) {
+  return production ? '__Host-financebot.refresh' : 'financebot.refresh'
 }
 
-function readSession(request: Request, production: boolean) {
-  const name = `${sessionCookieName(production)}=`
+function cookie(
+  value: string,
+  maxAge: number,
+  production: boolean,
+  refresh = false,
+) {
+  return `${refresh ? refreshCookieName(production) : sessionCookieName(production)}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${production ? '; Secure' : ''}`
+}
+
+function readSession(request: Request, production: boolean, refresh = false) {
+  const name = `${refresh ? refreshCookieName(production) : sessionCookieName(production)}=`
   const matches = (request.headers.get('cookie') ?? '')
     .split(';')
     .map((part) => part.trim())
     .filter((part) => part.startsWith(name))
   if (matches.length !== 1) return null
   const value = matches[0].slice(name.length)
-  return value.length <= 3500 && JWT_PATTERN.test(value) ? value : null
+  return value.length <= 3500 &&
+    (refresh ? REFRESH_PATTERN : JWT_PATTERN).test(value)
+    ? value
+    : null
+}
+
+export function hasRefreshCookie(request: Request, production: boolean) {
+  return readSession(request, production, true) !== null
+}
+
+function clearCookies(responseHeaders: Headers, production: boolean) {
+  responseHeaders.append('Set-Cookie', cookie('', 0, production))
+  responseHeaders.append('Set-Cookie', cookie('', 0, production, true))
 }
 
 function validateOptions(options: WebApiOptions, request: Request) {
@@ -183,16 +208,22 @@ export async function handleWebApi(
   ) {
     return problem(403, 'Origem da solicitação não permitida.')
   }
-  if (path === '/auth/logout') {
-    const responseHeaders = headers()
-    responseHeaders.set('Set-Cookie', cookie('', 0, options.production))
-    return new Response(null, { status: 204, headers: responseHeaders })
-  }
   const authentication = path === '/auth/login' || path === '/auth/register'
   const token = readSession(request, options.production)
-  if (!authentication && !token) {
+  const refresh = readSession(request, options.production, true)
+  const refreshing = path === '/auth/refresh'
+  const logout = path === '/auth/logout'
+  if (logout && !refresh) {
     const responseHeaders = headers()
-    responseHeaders.set('Set-Cookie', cookie('', 0, options.production))
+    clearCookies(responseHeaders, options.production)
+    return new Response(null, { status: 204, headers: responseHeaders })
+  }
+  if (!authentication && !(refreshing || logout ? refresh : token)) {
+    const responseHeaders = headers()
+    if (refreshing) clearCookies(responseHeaders, options.production)
+    else responseHeaders.append('Set-Cookie', cookie('', 0, options.production))
+    if (!refreshing && refresh)
+      responseHeaders.set('X-FinanceBot-Session-Renewable', '1')
     return problem(401, 'Entre novamente para continuar.', responseHeaders)
   }
   let body: string | undefined
@@ -204,6 +235,7 @@ export async function handleWebApi(
       'Conteúdo da solicitação inválido.',
     )
   }
+  if (refreshing || logout) body = JSON.stringify({ refreshToken: refresh })
   const outgoing = new Headers({ Accept: 'application/json' })
   if (body !== undefined) outgoing.set('Content-Type', 'application/json')
   if (!authentication && token) outgoing.set('Authorization', `Bearer ${token}`)
@@ -212,6 +244,17 @@ export async function handleWebApi(
     outgoing.set('Idempotency-Key', idempotencyKey)
   try {
     if (authentication) addClientAssertion(request, path, options, outgoing)
+    // Abas aguardam o mesmo Web Lock. A segunda já recebe os cookies renovados.
+    if (refreshing && token) {
+      const claims = JSON.parse(
+        Buffer.from(token.split('.')[1], 'base64url').toString(),
+      ) as { exp?: number }
+      if (
+        typeof claims.exp === 'number' &&
+        claims.exp * 1000 > (options.now?.() ?? Date.now()) + 30_000
+      )
+        return Response.json({ authenticated: true }, { headers: headers() })
+    }
     const upstreamUrl = new URL(path, configured.upstream)
     upstreamUrl.search = new URL(request.url).search
     const response = await (options.fetch ?? fetch)(upstreamUrl, {
@@ -227,11 +270,32 @@ export async function handleWebApi(
       const value = response.headers.get(name)
       if (value) responseHeaders.set(name, value)
     }
-    if (response.status === 401)
-      responseHeaders.set('Set-Cookie', cookie('', 0, options.production))
-    if (authentication && response.ok) {
+    if (response.status === 401) {
+      if (authentication || refreshing || logout)
+        clearCookies(responseHeaders, options.production)
+      else {
+        responseHeaders.append('Set-Cookie', cookie('', 0, options.production))
+        if (refresh) responseHeaders.set('X-FinanceBot-Session-Renewable', '1')
+      }
+    }
+    if (logout && response.ok) {
+      clearCookies(responseHeaders, options.production)
+      return new Response(null, { status: 204, headers: responseHeaders })
+    }
+    if ((authentication || refreshing) && response.ok) {
       const result = (await response.json()) as Record<string, unknown>
       const jwt = result.token
+      const refreshToken = result.refreshToken
+      const sessionExpiry =
+        typeof result.sessionExpiresAt === 'string'
+          ? Date.parse(result.sessionExpiresAt)
+          : NaN
+      if (
+        typeof refreshToken !== 'string' ||
+        !REFRESH_PATTERN.test(refreshToken) ||
+        !Number.isFinite(sessionExpiry)
+      )
+        throw new Error('session')
       if (
         typeof jwt !== 'string' ||
         jwt.length > 3500 ||
@@ -247,7 +311,19 @@ export async function handleWebApi(
         throw new Error('expiration')
       const maxAge = Math.min(claims.exp - now, MAX_SESSION_SECONDS)
       if (maxAge <= 0) throw new Error('expired token')
-      responseHeaders.set('Set-Cookie', cookie(jwt, maxAge, options.production))
+      const refreshAge = Math.min(
+        Math.floor(sessionExpiry / 1000) - now,
+        MAX_SESSION_SECONDS,
+      )
+      if (refreshAge <= 0) throw new Error('expired session')
+      responseHeaders.append(
+        'Set-Cookie',
+        cookie(jwt, maxAge, options.production),
+      )
+      responseHeaders.append(
+        'Set-Cookie',
+        cookie(refreshToken, refreshAge, options.production, true),
+      )
       // O JWT nunca integra JSON/HTML/estado JavaScript do navegador.
       return Response.json(
         { authenticated: true },

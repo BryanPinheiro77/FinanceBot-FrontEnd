@@ -560,3 +560,33 @@ test('exclusão com resposta perdida exige conferir lista sem repetição autom�
   ).toHaveCount(0)
   expect(deletions).toBe(1)
 })
+
+test('criação renova sessão e preserva corpo e chave sem duplicar', async ({
+  page,
+}) => {
+  await login(page)
+  const attempts: { key: string; body: string | null }[] = []
+  await page.route('**/api/financebot/transactions', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue()
+    attempts.push({
+      key: route.request().headers()['idempotency-key'],
+      body: route.request().postData(),
+    })
+    if (attempts.length === 1)
+      return route.fulfill({
+        status: 401,
+        headers: { 'X-FinanceBot-Session-Renewable': '1' },
+        json: { detail: 'Renove a sessão.' },
+      })
+    return route.continue()
+  })
+  await fillCreate(page, 'Criação com renovação')
+  const renewed = page.waitForResponse('**/api/financebot/auth/refresh')
+  await save(page)
+  expect((await renewed).status()).toBe(200)
+  await expect(
+    page.getByText('22 transações encontradas', { exact: true }),
+  ).toBeVisible()
+  expect(attempts).toHaveLength(2)
+  expect(attempts[0]).toEqual(attempts[1])
+})

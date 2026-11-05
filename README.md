@@ -23,7 +23,10 @@ O navegador chama `/api/financebot/*` na própria origem. O servidor web recebe 
 Bearer da API e guarda em cookie `HttpOnly`, `SameSite=Lax`, host-only e `Secure`
 em produção, sem devolver JWT no JSON. JavaScript não lê o cookie nem mantém
 JWT em localStorage/sessionStorage. Tokens antigos são descartados, exigindo
-novo login. Logout limpa a sessão local; não revoga um JWT já copiado por terceiro.
+novo login. Logout revoga a sessão na API antes de limpar os cookies. Access tokens
+expiram em 15 minutos e são renovados com refresh rotativo em outro cookie protegido.
+Após 1 hora sem interação, um aviso de 60 segundos permite continuar conectado ou
+sair. A API também valida a ociosidade, e a sessão tem limite absoluto de 8 horas.
 
 Mutações exigem origem exata e header próprio; o proxy tem allowlist de rotas,
 não encaminha headers arbitrários, bloqueia redirects do upstream e evita cache

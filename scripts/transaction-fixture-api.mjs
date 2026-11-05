@@ -1,5 +1,6 @@
 // API isolada de testes: identidades fictícias, sem secrets, banco ou produção.
 import { createServer } from 'node:http'
+import { randomBytes } from 'node:crypto'
 const tokens = new Map()
 const users = new Map()
 let nextUser = 1
@@ -94,12 +95,25 @@ const server = createServer(async (request, response) => {
     if (!users.has(body.email)) users.set(body.email, seed(body.email))
     const token = `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(JSON.stringify({ sub: body.email, exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url')}.Zml4dHVyZS1vbmx5`
     tokens.set(token, users.get(body.email))
-    return send(200, { token, type: 'Bearer' })
+    return send(200, {
+      token,
+      type: 'Bearer',
+      refreshToken: randomBytes(32).toString('base64url'),
+      sessionExpiresAt: new Date(Date.now() + 8 * 3600_000).toISOString(),
+    })
   }
   const user = tokens.get(
     request.headers.authorization?.replace(/^Bearer /, ''),
   )
   if (!user) return send(401, { detail: 'Entre novamente.' })
+  if (url.pathname === '/auth/session' || url.pathname === '/auth/activity') {
+    return send(200, {
+      lastActivityAt: new Date().toISOString(),
+      idleWarningAt: new Date(Date.now() + 3600_000).toISOString(),
+      idleExpiresAt: new Date(Date.now() + 3660_000).toISOString(),
+      sessionExpiresAt: new Date(Date.now() + 8 * 3600_000).toISOString(),
+    })
+  }
   if (request.method === 'GET' && url.pathname === '/users/me') {
     const {
       id,

@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import {
   getCurrentUser,
@@ -24,7 +25,10 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
   const [user, setUser] = useState<CurrentUser | null>(null);
+  const currentUserRef = useRef<CurrentUser | null>(null);
+  currentUserRef.current = user;
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = async () => {
@@ -65,7 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const expireSession = () => setUser(null);
+    const expireSession = () => {
+      const hadSession = currentUserRef.current !== null;
+      setUser(null);
+      // O bootstrap anônimo também recebe 401; visitantes da landing ficam nela.
+      if (hadSession) void navigate({ to: '/login' });
+    };
     window.addEventListener("financebot:session-expired", expireSession);
     void bootstrapAuth();
 
@@ -94,6 +103,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await logoutRequest();
     setUser(null);
+    const bus = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('financebot:session');
+    bus?.postMessage({ type: 'logout' });
+    bus?.close();
   };
 
   const value = useMemo<AuthContextValue>(() => ({
