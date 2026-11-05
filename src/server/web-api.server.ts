@@ -21,6 +21,7 @@ const ALLOWED = new Set([
   'GET /users/me',
   'GET /accounts',
   'GET /categories',
+  'GET /dashboard/monthly-summary',
   'PATCH /users/me/monthly-base-income',
   'PATCH /users/me/onboarding-completed',
   'POST /users/me/telegram-link-code',
