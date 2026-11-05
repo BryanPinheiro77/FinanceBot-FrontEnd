@@ -1,16 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import {
-  Bot,
-  ChevronLeft,
-  ChevronRight,
-  ExternalLink,
-  LogOut,
-  Moon,
-  Sun,
-} from 'lucide-react'
-import { toast } from 'sonner'
-import { useTheme } from '@/hooks/use-theme'
+import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
+import { FinanceHeader } from '@/components/FinanceHeader'
 import { Button } from '@/components/ui/button'
 import { MonthlyCharts } from '@/components/dashboard/MonthlyCharts'
 import { useAuth } from '@/context/auth-context'
@@ -25,6 +16,7 @@ import {
   shiftMonth,
 } from '@/lib/dashboard-api'
 import type { MonthlySummary } from '@/lib/dashboard-api'
+import { monthPeriod } from '@/lib/transaction-model'
 import { ApiError } from '@/lib/api'
 import '../components/dashboard/dashboard.css'
 
@@ -50,13 +42,11 @@ type DashboardState = {
 }
 
 function DashboardPage() {
-  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
-  const { user, isLoading, logout } = useAuth()
+  const { user, isLoading } = useAuth()
   const [month, setMonth] = useState(currentMonth)
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState<DashboardState | null>(null)
-  const [loggingOut, setLoggingOut] = useState(false)
   const userId = user?.id
   const onboarded = user?.onboardingCompleted
   const key = `${userId}:${month}:${attempt}`
@@ -113,48 +103,7 @@ function DashboardPage() {
       <a className="dashboard-skip" href="#dashboard-main">
         Pular para o conteúdo
       </a>
-      <header className="dashboard-header">
-        <div className="dashboard-shell dashboard-header-inner">
-          <a href="/" className="dashboard-brand">
-            <Bot aria-hidden="true" />
-            Finance Bot
-          </a>
-          <div className="dashboard-header-actions">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              aria-label={
-                theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'
-              }
-            >
-              {theme === 'dark' ? (
-                <Sun aria-hidden="true" />
-              ) : (
-                <Moon aria-hidden="true" />
-              )}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={loggingOut}
-              onClick={async () => {
-                setLoggingOut(true)
-                try {
-                  await logout()
-                  await navigate({ to: '/login' })
-                } catch {
-                  toast.error('Não foi possível sair agora. Tente novamente.')
-                  setLoggingOut(false)
-                }
-              }}
-            >
-              <LogOut aria-hidden="true" />
-              {loggingOut ? 'Saindo…' : 'Sair'}
-            </Button>
-          </div>
-        </div>
-      </header>
+      <FinanceHeader active="dashboard" period={monthPeriod(month)} />
       <main
         id="dashboard-main"
         tabIndex={-1}

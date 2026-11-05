@@ -1,96 +1,118 @@
-import { renewSession } from "@/lib/session-renewal";
-import { clearLegacyAuthToken } from "@/lib/legacy-auth-storage";
+import { renewSession } from '@/lib/session-renewal'
+import { clearLegacyAuthToken } from '@/lib/legacy-auth-storage'
 
-const API_BASE_URL = "/api/financebot";
+const API_BASE_URL = '/api/financebot'
 
 export interface ApiErrorPayload {
-  title?: string;
-  detail?: string;
-  message?: string;
-  error?: string;
-  status?: number;
+  title?: string
+  detail?: string
+  message?: string
+  error?: string
+  status?: number
 }
 
 export class ApiError extends Error {
-  status: number;
-  payload: ApiErrorPayload | null;
+  status: number
+  payload: ApiErrorPayload | null
 
-  constructor(message: string, status: number, payload: ApiErrorPayload | null = null) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-    this.payload = payload;
+  constructor(
+    message: string,
+    status: number,
+    payload: ApiErrorPayload | null = null,
+  ) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.payload = payload
   }
 }
 
 function buildUrl(path: string) {
-  return `${API_BASE_URL}${path}`;
+  return `${API_BASE_URL}${path}`
 }
 
-function resolveErrorMessage(payload: ApiErrorPayload | null, fallback: string) {
-  return payload?.detail || payload?.message || payload?.error || fallback;
+function resolveErrorMessage(
+  payload: ApiErrorPayload | null,
+  fallback: string,
+) {
+  return payload?.detail || payload?.message || payload?.error || fallback
 }
 
-async function parseResponse<T>(response: Response): Promise<T> {
+async function parseResponse<T>(
+  response: Response,
+  decode?: (text: string) => T,
+): Promise<T> {
   if (response.status === 204) {
-    return undefined as T;
+    return undefined as T
   }
 
-  const text = await response.text();
+  const text = await response.text()
 
   if (!text) {
-    return undefined as T;
+    return undefined as T
   }
 
-  return JSON.parse(text) as T;
+  return decode ? decode(text) : (JSON.parse(text) as T)
 }
 
-export async function apiRequest<T>(path: string, init: RequestInit = {}) {
-  clearLegacyAuthToken();
-  const headers = new Headers(init.headers);
+export async function apiRequest<T>(
+  path: string,
+  init: RequestInit = {},
+  decode?: (text: string) => T,
+) {
+  clearLegacyAuthToken()
+  const headers = new Headers(init.headers)
 
-  if (init.body && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
+  if (init.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
   }
 
-  headers.delete("Authorization");
-  headers.set("X-FinanceBot-CSRF", "1");
+  headers.delete('Authorization')
+  headers.set('X-FinanceBot-CSRF', '1')
 
-  const send = () => fetch(buildUrl(path), {
-    ...init,
-    headers,
-    credentials: "same-origin",
-    cache: "no-store",
-  });
+  const send = () =>
+    fetch(buildUrl(path), {
+      ...init,
+      headers,
+      credentials: 'same-origin',
+      cache: 'no-store',
+    })
 
-  let response = await send();
-  if (response.status === 401 && response.headers.get('X-FinanceBot-Session-Renewable') === '1' && !path.startsWith('/auth/login') && !path.startsWith('/auth/register') && !path.startsWith('/auth/logout')) {
-    if (await renewSession()) response = await send();
+  let response = await send()
+  if (
+    response.status === 401 &&
+    response.headers.get('X-FinanceBot-Session-Renewable') === '1' &&
+    !path.startsWith('/auth/login') &&
+    !path.startsWith('/auth/register') &&
+    !path.startsWith('/auth/logout')
+  ) {
+    if (await renewSession()) response = await send()
   }
 
   if (!response.ok) {
-    let payload: ApiErrorPayload | null = null;
+    let payload: ApiErrorPayload | null = null
 
     try {
-      payload = await parseResponse<ApiErrorPayload>(response);
+      payload = await parseResponse<ApiErrorPayload>(response)
     } catch {
-      payload = null;
+      payload = null
     }
 
     if (response.status === 401) {
-      if (typeof window !== "undefined") window.dispatchEvent(new Event("financebot:session-expired"));
+      if (typeof window !== 'undefined')
+        window.dispatchEvent(new Event('financebot:session-expired'))
     }
 
     throw new ApiError(
-      resolveErrorMessage(payload, "Não foi possível concluir a solicitação."),
+      resolveErrorMessage(payload, 'Não foi possível concluir a solicitação.'),
       response.status,
       payload,
-    );
+    )
   }
 
-  return parseResponse<T>(response);
+  return parseResponse<T>(response, decode)
 }
 
 export function getApiBaseUrl() {
-  return API_BASE_URL;
+  return API_BASE_URL
 }

@@ -15,6 +15,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as RenovarSessaoRouteImport } from './routes/renovar-sessao'
+import { Route as TransactionsRouteImport } from './routes/transactions'
 import { Route as ApiFinancebotSplatRouteImport } from './routes/api/financebot/$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -47,6 +48,11 @@ const RenovarSessaoRoute = RenovarSessaoRouteImport.update({
   path: '/renovar-sessao',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TransactionsRoute = TransactionsRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFinancebotSplatRoute = ApiFinancebotSplatRouteImport.update({
   id: '/api/financebot/$',
   path: '/api/financebot/$',
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/renovar-sessao': typeof RenovarSessaoRoute
+  '/transactions': typeof TransactionsRoute
   '/api/financebot/$': typeof ApiFinancebotSplatRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/renovar-sessao': typeof RenovarSessaoRoute
+  '/transactions': typeof TransactionsRoute
   '/api/financebot/$': typeof ApiFinancebotSplatRoute
 }
 export interface FileRoutesById {
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/renovar-sessao': typeof RenovarSessaoRoute
+  '/transactions': typeof TransactionsRoute
   '/api/financebot/$': typeof ApiFinancebotSplatRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/onboarding'
     | '/renovar-sessao'
+    | '/transactions'
     | '/api/financebot/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/onboarding'
     | '/renovar-sessao'
+    | '/transactions'
     | '/api/financebot/$'
   id:
     | '__root__'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/onboarding'
     | '/renovar-sessao'
+    | '/transactions'
     | '/api/financebot/$'
   fileRoutesById: FileRoutesById
 }
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
   RenovarSessaoRoute: typeof RenovarSessaoRoute
+  TransactionsRoute: typeof TransactionsRoute
   ApiFinancebotSplatRoute: typeof ApiFinancebotSplatRoute
 }
 
@@ -165,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RenovarSessaoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/transactions': {
+      id: '/transactions'
+      path: '/transactions'
+      fullPath: '/transactions'
+      preLoaderRoute: typeof TransactionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/financebot/$': {
       id: '/api/financebot/$'
       path: '/api/financebot/$'
@@ -182,6 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
   RenovarSessaoRoute: RenovarSessaoRoute,
+  TransactionsRoute: TransactionsRoute,
   ApiFinancebotSplatRoute: ApiFinancebotSplatRoute,
 }
 export const routeTree = rootRouteImport

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apiRequest } from './api'
+import { decodeTransactionJson } from './transaction-model'
+
 const state = vi.hoisted(() => ({ renew: vi.fn() }))
 vi.mock('./session-renewal', () => ({ renewSession: state.renew }))
 afterEach(() => {
@@ -33,4 +35,40 @@ describe('renovação apenas quando há sessão renovável', () => {
     expect(state.renew).toHaveBeenCalledOnce()
     expect(request).toHaveBeenCalledTimes(2)
   })
+})
+
+it('preserva decimal, corpo e chave de criação ao renovar a sessão', async () => {
+  const body = '{"amount":99999999999999999.99,"description":"Teste"}'
+  const request = vi
+    .fn()
+    .mockResolvedValueOnce(
+      Response.json(
+        {},
+        {
+          status: 401,
+          headers: { 'X-FinanceBot-Session-Renewable': '1' },
+        },
+      ),
+    )
+    .mockResolvedValueOnce(new Response('{"amount":99999999999999999.99}'))
+  vi.stubGlobal('fetch', request)
+  state.renew.mockResolvedValueOnce(true)
+  await expect(
+    apiRequest(
+      '/transactions',
+      {
+        method: 'POST',
+        body,
+        headers: { 'Idempotency-Key': 'fixture-key' },
+      },
+      decodeTransactionJson,
+    ),
+  ).resolves.toEqual({ amount: '99999999999999999.99' })
+  expect(state.renew).toHaveBeenCalledOnce()
+  expect(request).toHaveBeenCalledTimes(2)
+  for (const [, init] of request.mock.calls) {
+    expect(init.body).toBe(body)
+    expect(init.headers.get('Idempotency-Key')).toBe('fixture-key')
+    expect(init.headers.get('X-FinanceBot-CSRF')).toBe('1')
+  }
 })

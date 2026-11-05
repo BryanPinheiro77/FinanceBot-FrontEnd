@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
 
 test('login, recarga e logout usam cookie HttpOnly e removem o token antigo', async ({
   page,
@@ -124,7 +125,7 @@ test('sessões de dois navegadores não compartilham identidade', async ({
   }
 })
 
-async function signIn(page: import('@playwright/test').Page) {
+async function signIn(page: Page) {
   await page.goto('/login')
   await page.getByPlaceholder('joao@email.com').fill('session@example.invalid')
   await page.getByPlaceholder('Sua senha').fill('fixture-password')
@@ -136,7 +137,24 @@ test('renova sessão no reload quando access expirou, sem expor refresh a JavaSc
   page,
   context,
 }) => {
+  // Simular expiração após o bootstrap, sem interromper requisições da navegação inicial.
+  const initialRequests = [
+    '/auth/session',
+    '/accounts',
+    '/dashboard/monthly-summary',
+  ].map((path) =>
+    page
+      .waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname.endsWith(path) && response.ok(),
+      )
+      .then((response) => response.finished()),
+  )
   await signIn(page)
+  await expect(
+    page.getByRole('button', { name: 'Sair', exact: true }),
+  ).toBeVisible()
+  await Promise.all(initialRequests)
   const before = (await context.cookies()).find(
     (cookie) => cookie.name === 'financebot.refresh',
   )!

@@ -378,6 +378,103 @@ describe('sessão web no servidor', () => {
     expect(config.fetch).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['GET', '/transactions'],
+    ['POST', '/transactions'],
+    ['GET', '/transactions/1'],
+    ['PUT', '/transactions/1'],
+    ['DELETE', '/transactions/1'],
+  ])(
+    'autoriza somente a operação autenticada %s %s e mantém CSRF/no-store',
+    async (method, path) => {
+      const config = options(Response.json({ id: 1 }))
+      const req = request(path, method, {
+        Cookie: `__Host-financebot.session=${jwt}`,
+      })
+      expect((await handleWebApi(req, path, config)).status).toBe(200)
+      expect(
+        new Headers(config.fetch.mock.calls[0][1]!.headers).get(
+          'Authorization',
+        ),
+      ).toBe(`Bearer ${jwt}`)
+      config.fetch.mockClear()
+      expect(
+        (await handleWebApi(request(path, method), path, config)).status,
+      ).toBe(401)
+      expect(config.fetch).not.toHaveBeenCalled()
+      if (method !== 'GET') {
+        req.headers.set('Origin', 'https://attacker.invalid')
+        expect((await handleWebApi(req, path, config)).status).toBe(403)
+        expect(config.fetch).not.toHaveBeenCalled()
+        req.headers.set('Origin', base.webOrigin!)
+        req.headers.delete('X-FinanceBot-CSRF')
+        expect((await handleWebApi(req, path, config)).status).toBe(403)
+      }
+    },
+  )
+
+  it.each([
+    ['GET', '/transactions/0'],
+    ['GET', '/transactions/01'],
+    ['GET', '/transactions/-1'],
+    ['GET', '/transactions/9223372036854775808'],
+    ['POST', '/transactions/1'],
+    ['PATCH', '/transactions/1'],
+    ['DELETE', '/transactions'],
+    ['POST', '/transactions/installments'],
+    ['GET', '/transactions/1/internal'],
+    ['GET', '/transactions/%31'],
+  ])('não amplia o proxy para %s %s', async (method, path) => {
+    const config = options()
+    expect(
+      (await handleWebApi(request(path, method), path, config)).status,
+    ).toBe(404)
+    expect(config.fetch).not.toHaveBeenCalled()
+  })
+
+  it('preserva filtros, ordem, corpo monetário e chave da mesma criação', async () => {
+    const config = options(
+      Response.json({ transaction: { id: 1 } }, { status: 201 }),
+    )
+    const path = '/transactions'
+    const body = '{"amount":99999999999999999.99,"description":"Fixture"}'
+    const req = new Request(
+      'https://web.example.invalid/api/financebot/transactions',
+      {
+        method: 'POST',
+        headers: {
+          Origin: base.webOrigin!,
+          'X-FinanceBot-CSRF': '1',
+          Cookie: `__Host-financebot.session=${jwt}`,
+          'Content-Type': 'application/json',
+          'Idempotency-Key': 'fixture-attempt-1',
+        },
+        body,
+      },
+    )
+    const response = await handleWebApi(req, path, config)
+    expect(response.status).toBe(201)
+    expect(config.fetch.mock.calls[0][1]!.body).toBe(body)
+    expect(
+      new Headers(config.fetch.mock.calls[0][1]!.headers).get(
+        'Idempotency-Key',
+      ),
+    ).toBe('fixture-attempt-1')
+    expect(response.headers.get('Cache-Control')).toContain('no-store')
+    expect(response.headers.get('Vary')).toBe('Cookie')
+    config.fetch.mockClear()
+    config.fetch.mockResolvedValue(Response.json({ content: [] }))
+    const query = '?page=2&size=10&type=EXPENSE&sort=date%2Cdesc&sort=id%2Cdesc'
+    const get = new Request(
+      `https://web.example.invalid/api/financebot/transactions${query}`,
+      { headers: { Cookie: `__Host-financebot.session=${jwt}` } },
+    )
+    await handleWebApi(get, path, config)
+    expect(String(config.fetch.mock.calls[0][0])).toBe(
+      `https://api.example.invalid/transactions${query}`,
+    )
+  })
+
   it('permite cookie sem Secure apenas no desenvolvimento local', async () => {
     const config = { ...options(), production: false, trustVercelIp: false }
     const response = await handleWebApi(request(), '/auth/login', config)
